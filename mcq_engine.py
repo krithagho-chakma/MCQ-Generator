@@ -75,35 +75,35 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     {context_block}
     """
     
-response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
+    response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+            )
         )
-    )
-    
-    raw_output = response.text.strip()
-    
-    # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
-    if raw_output.startswith("```json"):
-        raw_output = raw_output[7:-3].strip()
-    elif raw_output.startswith("```"):
-        raw_output = raw_output[3:-3].strip()
         
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError as e:
-        # 2. If it still fails, try a non-greedy regex to find just the first complete array
-        import re
-        match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except:
-                pass
+        raw_output = response.text.strip()
         
-        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
-        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
+        # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
+        if raw_output.startswith("```json"):
+            raw_output = raw_output[7:-3].strip()
+        elif raw_output.startswith("```"):
+            raw_output = raw_output[3:-3].strip()
+            
+        try:
+            return json.loads(raw_output)
+        except json.JSONDecodeError as e:
+            # 2. If it still fails, try a non-greedy regex to find just the first complete array
+            import re
+            match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except:
+                    pass
+            
+            # 3. If all parsing fails, raise a custom error showing the EXACT broken text
+            raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
     model = genai.GenerativeModel(selected_model)
@@ -148,35 +148,35 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     {raw_mcq_text}
     """
     
-response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
+    response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+            )
         )
-    )
-    
-    raw_output = response.text.strip()
-    
-    # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
-    if raw_output.startswith("```json"):
-        raw_output = raw_output[7:-3].strip()
-    elif raw_output.startswith("```"):
-        raw_output = raw_output[3:-3].strip()
         
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError as e:
-        # 2. If it still fails, try a non-greedy regex to find just the first complete array
-        import re
-        match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except:
-                pass
+        raw_output = response.text.strip()
         
-        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
-        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
+        # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
+        if raw_output.startswith("```json"):
+            raw_output = raw_output[7:-3].strip()
+        elif raw_output.startswith("```"):
+            raw_output = raw_output[3:-3].strip()
+            
+        try:
+            return json.loads(raw_output)
+        except json.JSONDecodeError as e:
+            # 2. If it still fails, try a non-greedy regex to find just the first complete array
+            import re
+            match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except:
+                    pass
+            
+            # 3. If all parsing fails, raise a custom error showing the EXACT broken text
+            raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
 
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     # Build an HTML table. Pandoc handles HTML-to-Word conversions flawlessly.
