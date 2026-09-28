@@ -4,22 +4,29 @@ import json
 import pymupdf4llm
 import pypandoc
 import os
+import shutil
+import re
 import PyPDF2
 from docx import Document
 
 # --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
+    os.makedirs("media", exist_ok=True)
     with open("temp.pdf", "wb") as f:
         f.write(pdf_file.read())
-    text = pymupdf4llm.to_markdown("temp.pdf")
+        
+    # write_images=True forces it to save the physical images to the "media" folder
+    text = pymupdf4llm.to_markdown("temp.pdf", write_images=True, image_path="media")
     os.remove("temp.pdf")
     return text
 
 def extract_text_from_docx(docx_file):
     with open("temp.docx", "wb") as f:
         f.write(docx_file.read())
-    # pypandoc reads the docx and converts native Word equations to $LaTeX$
-    text = pypandoc.convert_file("temp.docx", "markdown")
+        
+    # --extract-media=. tells Pandoc to rip images out of the DOCX and save them locally 
+    # (usually creates a 'word/media' or 'media' folder)
+    text = pypandoc.convert_file("temp.docx", "markdown", extra_args=["--extract-media=."])
     os.remove("temp.docx")
     return text
 
@@ -44,6 +51,9 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     1. If the text contains mathematical equations or physics/chemistry formulas, you MUST use standard LaTeX (e.g., $E=mc^2$).
     2. You MUST double-escape all LaTeX backslashes for valid JSON (e.g., use \\frac{1}{2} instead of \frac{1}{2}, and \\sum instead of \sum).
     3. Output EXACTLY ONE continuous JSON array. Do not split the output into multiple arrays. Do not add any conversational text before or after the JSON.
+    
+    CRITICAL INSTRUCTION FOR IMAGES:
+    If the source text contains markdown image links (e.g., ![image](media/img.png) or ![alt](word/media/image1.jpeg)), you MUST preserve them exactly as they appear. Place them in the relevant JSON field (usually "question_title" or "solution_body"). Never modify, translate, or delete the image file paths.
     
     CRITICAL INSTRUCTIONS FOR DIFFICULTY LEVEL:
     You must generate EXACTLY:
@@ -121,6 +131,9 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     CRITICAL INSTRUCTION FOR MATH AND EQUATIONS:
     If the source text contains mathematical equations, chemical formulas, or physics expressions, you MUST preserve them using standard LaTeX format. Use $ for inline math (e.g., $E=mc^2$) and $$ for display math. Do NOT use plain text approximations.
 
+    CRITICAL INSTRUCTION FOR IMAGES:
+    If the source text contains markdown image links (e.g., ![image](media/img.png) or ![alt](word/media/image1.jpeg)), you MUST preserve them exactly as they appear. Place them in the relevant JSON field (usually "question_title" or "solution_body"). Never modify, translate, or delete the image file paths.
+    
     CRITICAL INSTRUCTION FOR THE 'topics' FIELD:
     Here is a list of allowed topics: {user_topics}
     For the "topics" field in each question, you MUST select EXACTLY ONE topic from the list above that best fits the question. Do not invent any new topics.
@@ -178,22 +191,32 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         # 3. If all parsing fails, raise a custom error showing the EXACT broken text
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
+def process_html_images(text):
+    """Finds Markdown images ![alt](path) and converts them to HTML <img> tags."""
+    # Limits width to 300px so massive images don't break the Word table layout
+    return re.sub(r'!\[.*?\]\((.*?)\)', r'<img src="\1" width="300" />', str(text))
+
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
-    # Build an HTML table. Pandoc handles HTML-to-Word conversions flawlessly.
     html = "<h1>Generated MCQs</h1>\n<table border='1'>\n"
     html += "<tr><th>Sl no.</th><th>Question Title</th><th>Option A</th><th>Option B</th><th>Option C</th><th>Option D</th><th>Solution Body</th><th>Correct Option</th><th>Subject</th><th>Chapter</th><th>Topics</th><th>Question Category</th><th>Difficulty Level</th></tr>\n"
     
     for mcq in mcq_data:
         html += "<tr>"
         html += f"<td>{mcq.get('sl_no', '')}</td>"
-        html += f"<td>{mcq.get('question_title', '')}</td>"
-        html += f"<td>{mcq.get('A', '')}</td>"
-        html += f"<td>{mcq.get('B', '')}</td>"
-        html += f"<td>{mcq.get('C', '')}</td>"
-        html += f"<td>{mcq.get('D', '')}</td>"
         
-        # Replace python newline characters with HTML breaks for the 2-line solution body
+        # Process images in the title
+        q_title = process_html_images(mcq.get('question_title', ''))
+        html += f"<td>{q_title}</td>"
+        
+        # Process images in options (just in case)
+        html += f"<td>{process_html_images(mcq.get('A', ''))}</td>"
+        html += f"<td>{process_html_images(mcq.get('B', ''))}</td>"
+        html += f"<td>{process_html_images(mcq.get('C', ''))}</td>"
+        html += f"<td>{process_html_images(mcq.get('D', ''))}</td>"
+        
+        # Process line breaks AND images in the solution body
         sol_body = str(mcq.get('solution_body', '')).replace('\n', '<br>')
+        sol_body = process_html_images(sol_body)
         html += f"<td>{sol_body}</td>"
         
         html += f"<td>{mcq.get('correct_option', '')}</td>"
@@ -206,8 +229,16 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     
     html += "</table>"
     
-    # format='html+tex_math_dollars' tells Pandoc to render the HTML table but also parse $x^2$ as equations
+    # Convert to DOCX
     pypandoc.convert_text(html, 'docx', format='html+tex_math_dollars', outputfile=output_filename)
+    
+    # --- TEMPORARY FILE CLEANUP ---
+    # Delete the extracted image folders so they don't clog up your server storage
+    if os.path.exists("media"):
+        shutil.rmtree("media")
+    if os.path.exists("word"): # Pandoc often extracts DOCX media to a 'word/media' folder
+        shutil.rmtree("word")
+        
 def run_mcq_interface(model_choice, api_key_input):
     # Initialize session state for API Key and Table Data
     if "user_api_key" not in st.session_state:
