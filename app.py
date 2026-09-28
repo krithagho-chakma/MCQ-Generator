@@ -10,7 +10,6 @@ st.set_page_config(page_title="MCQ Engine", page_icon="📚", layout="wide")
 # Injecting custom CSS to make the UI minimal and clean
 st.markdown("""
     <style>
-        /* Hide Streamlit branding and top/bottom padding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
@@ -18,7 +17,6 @@ st.markdown("""
             padding-top: 2rem;
             padding-bottom: 2rem;
         }
-        /* Style the tabs for a more modern look */
         .stTabs [data-baseweb="tab-list"] {
             gap: 24px;
         }
@@ -33,15 +31,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. PERSISTENT SESSION STATE API KEY ---
+# --- 2. PERSISTENT SESSION STATE ---
+# Initialize session state for API Key and Table Data
+if "user_api_key" not in st.session_state:
+    st.session_state["user_api_key"] = ""
+if "mcq_data_t1" not in st.session_state:
+    st.session_state["mcq_data_t1"] = None
+if "mcq_data_t2" not in st.session_state:
+    st.session_state["mcq_data_t2"] = None
+
 st.sidebar.title("⚙️ Configuration")
 st.sidebar.markdown("---")
 
-# Initialize session state for the key if it doesn't exist yet
-if "user_api_key" not in st.session_state:
-    st.session_state["user_api_key"] = ""
-
-# Sidebar input linked to session state
 api_key_input = st.sidebar.text_input(
     "🔑 Gemini API Key:", 
     value=st.session_state["user_api_key"], 
@@ -49,7 +50,6 @@ api_key_input = st.sidebar.text_input(
     help="Enter your Google AI Studio API key to power the engine."
 )
 
-# Save to session state whenever user enters or changes it
 if api_key_input:
     st.session_state["user_api_key"] = api_key_input
     genai.configure(api_key=st.session_state["user_api_key"])
@@ -57,7 +57,7 @@ if api_key_input:
 else:
     st.sidebar.warning("API key required to proceed.")
 
-# --- 3. HELPER FUNCTIONS (UNCHANGED) ---
+# --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
@@ -196,6 +196,7 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
         
     for mcq in mcq_data:
         row_cells = table.add_row().cells
+        # Use .get() defensively with a string fallback just in case rows were added manually
         row_cells[0].text = str(mcq.get("sl_no", ""))
         row_cells[1].text = str(mcq.get("question_title", ""))
         row_cells[2].text = str(mcq.get("A", ""))
@@ -249,8 +250,6 @@ tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing MCQs"])
 
 # ================= TAB 1: GENERATE NEW MCQS =================
 with tab1:
-    
-    # Source Material Container
     with st.container(border=True):
         st.markdown("#### 📄 1. Source Material (Optional)")
         st.caption("Leave blank to generate questions based purely on the topics provided below.")
@@ -261,7 +260,6 @@ with tab1:
         with col_text:
             raw_text = st.text_area("Or paste raw text here", height=100)
 
-    # Question Parameters Container
     with st.container(border=True):
         st.markdown("#### 🎯 2. Question Parameters")
         topics_input = st.text_input(
@@ -275,7 +273,6 @@ with tab1:
             key="t1_custom_instructions"
         )
 
-    # Difficulty Container
     with st.container(border=True):
         st.markdown("#### 📊 3. Difficulty Breakdown")
         col1, col2, col3 = st.columns(3)
@@ -296,7 +293,6 @@ with tab1:
     with col_msg:
         st.info(f"Target Generation: **{total_q}** Questions")
 
-    # Execution Logic
     if generate_btn:
         if not api_key_input:
             st.error("Please enter your API Key in the sidebar first!")
@@ -316,39 +312,43 @@ with tab1:
                     text_to_process = raw_text
                     
                 try:
-                    mcq_json = generate_mcqs(
-                        text_to_process, 
-                        topics_input, 
-                        custom_instructions, 
-                        num_easy, 
-                        num_medium, 
-                        num_hard, 
-                        model_choice
+                    # Fetch and save data into Session State so it doesn't vanish when edited
+                    st.session_state["mcq_data_t1"] = generate_mcqs(
+                        text_to_process, topics_input, custom_instructions, 
+                        num_easy, num_medium, num_hard, model_choice
                     )
-                    create_mcq_docx(mcq_json, "Generated_MCQs.docx")
-                    
                     st.success("✨ Generation Complete!")
-
-                    # --- NEW PREVIEW PANEL ---
-                    with st.container(border=True):
-                        st.markdown("#### 👀 Preview of Generated Table")
-                        st.dataframe(mcq_json, use_container_width=True)
-                    
-                    with open("Generated_MCQs.docx", "rb") as file:
-                        st.download_button(
-                            label="📥 Download Word Document (.docx)",
-                            data=file,
-                            file_name="Generated_MCQs.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True
-                        )
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
 
+    # Display the editable table and download button IF data exists in session state
+    if st.session_state["mcq_data_t1"]:
+        with st.container(border=True):
+            st.markdown("#### 👀 Preview & Edit Generated Table")
+            st.caption("Double-click any cell to edit its text. You can also add or delete rows using the tools on the right. Changes instantly apply to your download.")
+            
+            # Interactive Data Editor
+            edited_data_t1 = st.data_editor(
+                st.session_state["mcq_data_t1"], 
+                use_container_width=True, 
+                num_rows="dynamic", 
+                key="editor_t1"
+            )
+        
+        # Build the Word Document using the EDITED data
+        create_mcq_docx(edited_data_t1, "Generated_MCQs.docx")
+        
+        with open("Generated_MCQs.docx", "rb") as file:
+            st.download_button(
+                label="📥 Download Edited Word Document (.docx)",
+                data=file,
+                file_name="Generated_MCQs.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
 
 # ================= TAB 2: FORMAT EXISTING MCQS =================
 with tab2:
-    
     with st.container(border=True):
         st.markdown("#### 📝 1. Raw Input")
         st.caption("Upload or paste your unformatted questions.")
@@ -387,24 +387,37 @@ with tab2:
                     text_to_process = raw_text_t2
                     
                 try:
-                    mcq_json = parse_existing_mcqs(text_to_process, topics_input_t2, special_instructions, model_choice)
-                    create_mcq_docx(mcq_json, "Formatted_Ready_MCQs.docx")
-                    
+                    # Save parsed data to Session State
+                    st.session_state["mcq_data_t2"] = parse_existing_mcqs(
+                        text_to_process, topics_input_t2, special_instructions, model_choice
+                    )
                     st.success("✨ Successfully reformatted into table format!")
-
-                    # --- NEW PREVIEW PANEL ---
-                    with st.container(border=True):
-                        st.markdown("#### 👀 Preview of Formatted Table")
-                        st.dataframe(mcq_json, use_container_width=True)
-                    
-                    with open("Formatted_Ready_MCQs.docx", "rb") as f:
-                        st.download_button(
-                            label="📥 Download Formatted Word Document (.docx)",
-                            data=f,
-                            file_name="Formatted_Ready_MCQs.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True,
-                            key="dl_t2"
-                        )
                 except Exception as e:
                     st.error(f"Error parsing MCQs: {e}")
+
+    # Display the editable table and download button IF data exists in session state
+    if st.session_state["mcq_data_t2"]:
+        with st.container(border=True):
+            st.markdown("#### 👀 Preview & Edit Formatted Table")
+            st.caption("Double-click any cell to edit its text. You can also add or delete rows. Changes instantly apply to your download.")
+            
+            # Interactive Data Editor
+            edited_data_t2 = st.data_editor(
+                st.session_state["mcq_data_t2"], 
+                use_container_width=True, 
+                num_rows="dynamic", 
+                key="editor_t2"
+            )
+        
+        # Build the Word Document using the EDITED data
+        create_mcq_docx(edited_data_t2, "Formatted_Ready_MCQs.docx")
+        
+        with open("Formatted_Ready_MCQs.docx", "rb") as f:
+            st.download_button(
+                label="📥 Download Edited Word Document (.docx)",
+                data=f,
+                file_name="Formatted_Ready_MCQs.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="dl_t2"
+            )
