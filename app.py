@@ -36,9 +36,9 @@ def extract_text_from_pdf(pdf_file):
             text += extracted + "\n"
     return text
 
-def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard):
-    """Sends the text, topics, and difficulty distribution using the legacy SDK."""
-    model = genai.GenerativeModel('gemini-3.1-flash-lite')
+def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard, selected_model):
+    """Sends the text, topics, and difficulty distribution using the chosen SDK."""
+    model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
     
     prompt = f"""
@@ -225,7 +225,7 @@ with tab1:
     if st.button("Generate MCQs"):
         if not api_key_input:
             st.error("Please enter your API Key in the sidebar first!")
-        if total_q == 0:
+        elif total_q == 0:
             st.error("Please specify at least one question to generate.")
         elif not topics_input:
             st.error("Please provide at least one topic.")
@@ -240,7 +240,8 @@ with tab1:
                     text_to_process = raw_text
                     
                 try:
-                    mcq_json = generate_mcqs(text_to_process, topics_input, num_easy, num_medium, num_hard)
+                    # Added model_choice here so the dropdown works correctly
+                    mcq_json = generate_mcqs(text_to_process, topics_input, num_easy, num_medium, num_hard, model_choice)
                     create_mcq_docx(mcq_json, "Generated_MCQs.docx")
                     
                     st.success("Successfully generated!")
