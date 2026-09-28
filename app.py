@@ -4,8 +4,38 @@ import json
 import PyPDF2
 from docx import Document
 
-# --- 1. PERSISTENT SESSION STATE API KEY ---
+# --- 1. PAGE CONFIG & CUSTOM CSS (NEW UI IMPROVEMENTS) ---
+st.set_page_config(page_title="MCQ Engine", page_icon="📚", layout="wide")
+
+# Injecting custom CSS to make the UI minimal and clean
+st.markdown("""
+    <style>
+        /* Hide Streamlit branding and top/bottom padding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        /* Style the tabs for a more modern look */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 24px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            white-space: pre-wrap;
+            background-color: transparent;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 2. PERSISTENT SESSION STATE API KEY ---
 st.sidebar.title("⚙️ Configuration")
+st.sidebar.markdown("---")
 
 # Initialize session state for the key if it doesn't exist yet
 if "user_api_key" not in st.session_state:
@@ -13,21 +43,22 @@ if "user_api_key" not in st.session_state:
 
 # Sidebar input linked to session state
 api_key_input = st.sidebar.text_input(
-    "Enter your Gemini API Key:", 
+    "🔑 Gemini API Key:", 
     value=st.session_state["user_api_key"], 
-    type="password"
+    type="password",
+    help="Enter your Google AI Studio API key to power the engine."
 )
 
 # Save to session state whenever user enters or changes it
 if api_key_input:
     st.session_state["user_api_key"] = api_key_input
     genai.configure(api_key=st.session_state["user_api_key"])
+    st.sidebar.success("API Key Active")
 else:
-    st.sidebar.warning("Please enter your API key to proceed.")
+    st.sidebar.warning("API key required to proceed.")
 
-# --- 2. HELPER FUNCTIONS ---
+# --- 3. HELPER FUNCTIONS (UNCHANGED) ---
 def extract_text_from_pdf(pdf_file):
-    """Reads the uploaded PDF and pulls all the text out."""
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
     for page in reader.pages:
@@ -37,7 +68,6 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 def extract_text_from_docx(docx_file):
-    """Reads the uploaded DOCX and pulls all the text out."""
     doc = Document(docx_file)
     text = ""
     for para in doc.paragraphs:
@@ -46,11 +76,9 @@ def extract_text_from_docx(docx_file):
     return text
 
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
-    """Sends text, topic limits, custom generation instructions, and difficulty distribution using the chosen SDK."""
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
     
-    # Dynamic instruction based on whether context text was provided
     if context_text.strip():
         source_instruction = "Based on the provided Context Text and user instructions, generate"
         context_block = f"Context Text:\n{context_text}"
@@ -104,7 +132,6 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     return json.loads(response.text)
 
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
-    """Parses PRE-EXISTING raw MCQs and maps them to the required 13-column schema."""
     model = genai.GenerativeModel(selected_model)
     
     prompt = f"""
@@ -151,7 +178,6 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     return json.loads(response.text)
 
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
-    """Creates the formatted Word Document with the 13-column table."""
     doc = Document()
     doc.add_heading('Generated MCQs', 0)
     
@@ -186,72 +212,90 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
         
     doc.save(output_filename)
 
-# --- 3. WEB INTERFACE (STREAMLIT) ---
-st.title("📚 MCQ Automation & Formatting Engine")
-# Create two tabs
-tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing Raw MCQs"])
+# --- 4. WEB INTERFACE (MODERNIZED UI) ---
+st.title("📚 MCQ Automation Engine")
+st.markdown("Automate the generation and formatting of board-standard multiple-choice questions.")
+
+# Create two clean tabs
+tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing MCQs"])
 
 # ================= TAB 1: GENERATE NEW MCQS =================
 with tab1:
-    st.write("Configure parameters, upload context (optional), and generate new MCQs.")
     
-    st.subheader("1. AI Model Selection")
-    model_choice = st.selectbox(
-        "Choose which Gemini model to use:",
-        options=[
-            "gemini-3.8-flash",
-            "gemini-3.7-flash",
-            "gemini-3.6-flash",
-            "gemini-3.5-flash",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite"
-        ],
-        index=1
-    )
+    # Model Selection Container
+    with st.container(border=True):
+        st.markdown("#### 🤖 AI Model Selection")
+        model_choice = st.selectbox(
+            "Select the Gemini engine for this task:",
+            options=[
+                "gemini-3.8-flash",
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite"
+            ],
+            index=1,
+            label_visibility="collapsed"
+        )
 
-    if model_choice == "gemini-3.8-flash":
-        st.warning("⚠️ **Free Tier Limit:** Only 20 requests per day. You will hit limits very quickly.")
-    elif model_choice == "gemini-3.7-flash":
-        st.info("💡 **Free Tier Limit:** 1,500 requests per day. Recommended for bulk generation.")
-    elif model_choice == "gemini-3.6-flash":
-        st.error("🚫 **Free Tier Limit:** Not available on the Free Tier. Requires a Pay-As-You-Go billing account.")
-    elif model_choice == "gemini-3.5-flash":
-        st.info("💡 **Free Tier Limit:** 1,500 requests per day. Fast and highly stable.")
-    elif model_choice == "gemini-3.5-flash-lite":
-        st.success("✅ **Free Tier Limit:** 1,500 requests per day. Ultra-fast for simpler, high-volume tasks.")
-    elif model_choice == "gemini-3.1-flash-lite":
-        st.success("✅ **Free Tier Limit:** 1,500 requests per day. High efficiency and speed for basic processing.")
+        if model_choice == "gemini-3.8-flash":
+            st.caption("⚠️ **Free Tier Limit:** 20 requests per day.")
+        elif model_choice == "gemini-3.7-flash":
+            st.caption("💡 **Free Tier Limit:** 1,500 requests per day. (Recommended)")
+        elif model_choice == "gemini-3.6-flash":
+            st.caption("🚫 **Free Tier Limit:** Requires Pay-As-You-Go account.")
+        else:
+            st.caption("✅ **Free Tier Limit:** 1,500 requests per day.")
 
-    st.subheader("2. Source Material (Optional)")
-    st.info("If left blank, the AI will generate questions based purely on your topics and instructions below.")
-    uploaded_file = st.file_uploader("Upload Source Document (PDF or DOCX)", type=["pdf", "docx"])
-    raw_text = st.text_area("Or paste raw source text here")
-    
-    st.subheader("3. Question Parameters")
-    topics_input = st.text_input(
-        "Allowed Topics for Table Mapping (comma-separated)", 
-        placeholder="e.g., Hardware, Memory, Super Computers"
-    )
-    
-    custom_instructions = st.text_area(
-        "Custom Generation Instructions for AI (Optional)", 
-        placeholder="e.g., 'Focus heavily on numerical problems', 'Generate questions in Bengali', 'Create questions matching Class 10 Board exam standards'",
-        key="t1_custom_instructions"
-    )
+    # Source Material Container
+    with st.container(border=True):
+        st.markdown("#### 📄 1. Source Material (Optional)")
+        st.caption("Leave blank to generate questions based purely on the topics provided below.")
+        
+        col_file, col_text = st.columns(2)
+        with col_file:
+            uploaded_file = st.file_uploader("Upload Document (PDF/DOCX)", type=["pdf", "docx"])
+        with col_text:
+            raw_text = st.text_area("Or paste raw text here", height=100)
 
-    st.write("Difficulty Breakdown (Number of Questions)")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        num_easy = st.number_input("Easy", min_value=0, max_value=50, value=10)
-    with col2:
-        num_medium = st.number_input("Medium", min_value=0, max_value=50, value=15)
-    with col3:
-        num_hard = st.number_input("Hard", min_value=0, max_value=50, value=5)
+    # Question Parameters Container
+    with st.container(border=True):
+        st.markdown("#### 🎯 2. Question Parameters")
+        topics_input = st.text_input(
+            "Allowed Topics for Table Mapping (comma-separated)", 
+            placeholder="e.g., Hardware, Memory, Super Computers"
+        )
+        custom_instructions = st.text_area(
+            "Custom Generation Instructions (Optional)", 
+            placeholder="e.g., 'Focus heavily on numerical problems', 'Generate questions in Bengali'",
+            height=100,
+            key="t1_custom_instructions"
+        )
+
+    # Difficulty Container
+    with st.container(border=True):
+        st.markdown("#### 📊 3. Difficulty Breakdown")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            num_easy = st.number_input("🟢 Easy", min_value=0, max_value=50, value=10)
+        with col2:
+            num_medium = st.number_input("🟡 Medium", min_value=0, max_value=50, value=15)
+        with col3:
+            num_hard = st.number_input("🔴 Hard", min_value=0, max_value=50, value=5)
 
     total_q = num_easy + num_medium + num_hard
-    st.info(f"Total questions to generate: {total_q}")
 
-    if st.button("Generate MCQs"):
+    st.markdown("<br>", unsafe_allow_html=True) # Spacer
+    
+    col_btn, col_msg = st.columns([1, 2])
+    with col_btn:
+        generate_btn = st.button("🚀 Generate MCQs", use_container_width=True, type="primary")
+    with col_msg:
+        st.info(f"Target Generation: **{total_q}** Questions")
+
+    # Execution Logic
+    if generate_btn:
         if not api_key_input:
             st.error("Please enter your API Key in the sidebar first!")
         elif total_q == 0:
@@ -259,7 +303,7 @@ with tab1:
         elif not topics_input:
             st.error("Please provide at least one topic for table mapping.")
         else:
-            with st.spinner(f"Generating {total_q} questions (this takes a minute)..."):
+            with st.spinner(f"Engine running... Generating {total_q} questions"):
                 text_to_process = ""
                 if uploaded_file:
                     if uploaded_file.name.endswith('.pdf'):
@@ -281,41 +325,51 @@ with tab1:
                     )
                     create_mcq_docx(mcq_json, "Generated_MCQs.docx")
                     
-                    st.success("Successfully generated!")
+                    st.success("✨ Generation Complete!")
                     
                     with open("Generated_MCQs.docx", "rb") as file:
                         st.download_button(
-                            label="Download Formatted Word Document",
+                            label="📥 Download Word Document (.docx)",
                             data=file,
                             file_name="Generated_MCQs.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True
                         )
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
 
+
 # ================= TAB 2: FORMAT EXISTING MCQS =================
 with tab2:
-    st.subheader("Convert & Reformat Pre-written MCQs")
-    st.write("Paste your raw, unformatted questions or upload a document containing ready MCQs.")
     
-    uploaded_file_t2 = st.file_uploader("1. Upload Raw MCQs Document (PDF or DOCX)", type=["pdf", "docx"], key="t2_pdf")
-    raw_text_t2 = st.text_area("Or paste raw pre-written MCQs here", height=200, placeholder="1. What is CPU?\nA. Brain\nB. Memory\nC. Output\nD. Storage\nAnswer: A", key="t2_text")
+    with st.container(border=True):
+        st.markdown("#### 📝 1. Raw Input")
+        st.caption("Upload or paste your unformatted questions.")
+        col_file_t2, col_text_t2 = st.columns(2)
+        with col_file_t2:
+            uploaded_file_t2 = st.file_uploader("Upload Raw MCQs (PDF/DOCX)", type=["pdf", "docx"], key="t2_pdf")
+        with col_text_t2:
+            raw_text_t2 = st.text_area("Or paste raw pre-written MCQs here", height=150, placeholder="1. What is CPU?\nA. Brain\nB. Memory\nC. Output\nD. Storage\nAnswer: A", key="t2_text")
     
-    topics_input_t2 = st.text_input("2. Target Topics (Optional)", placeholder="e.g., Computer Basics, Hardware", key="t2_topics")
-    
-    special_instructions = st.text_area(
-        "3. Special Instructions for AI (Optional)", 
-        placeholder="e.g., 'Set Subject to ICT', 'Fix any Bengali spelling mistakes', 'Automatically fill in missing solution explanations', 'Mark difficulty as Medium for all'",
-        key="t2_instructions"
-    )
+    with st.container(border=True):
+        st.markdown("#### 🎯 2. Formatting Parameters")
+        topics_input_t2 = st.text_input("Target Topics (Optional)", placeholder="e.g., Computer Basics, Hardware", key="t2_topics")
+        special_instructions = st.text_area(
+            "Special AI Instructions (Optional)", 
+            placeholder="e.g., 'Set Subject to ICT', 'Fix any Bengali spelling mistakes', 'Automatically fill in missing solution explanations'",
+            height=100,
+            key="t2_instructions"
+        )
 
-    if st.button("Format Existing MCQs", key="btn_t2"):
+    st.markdown("<br>", unsafe_allow_html=True) # Spacer
+
+    if st.button("🛠️ Format Existing MCQs", use_container_width=True, type="primary", key="btn_t2"):
         if not api_key_input:
             st.error("Please configure your API Key in the sidebar.")
         elif not uploaded_file_t2 and not raw_text_t2:
             st.error("Please provide your raw MCQs in the text box or upload a document.")
         else:
-            with st.spinner(f"Parsing and reformatting questions using {model_choice}..."):
+            with st.spinner("Parsing and reformatting questions..."):
                 text_to_process = ""
                 if uploaded_file_t2:
                     if uploaded_file_t2.name.endswith('.pdf'):
@@ -328,14 +382,16 @@ with tab2:
                 try:
                     mcq_json = parse_existing_mcqs(text_to_process, topics_input_t2, special_instructions, model_choice)
                     create_mcq_docx(mcq_json, "Formatted_Ready_MCQs.docx")
-                    st.success("Successfully reformatted into table format!")
+                    
+                    st.success("✨ Successfully reformatted into table format!")
                     
                     with open("Formatted_Ready_MCQs.docx", "rb") as f:
                         st.download_button(
-                            label="Download Formatted Word Document (.docx)",
+                            label="📥 Download Formatted Word Document (.docx)",
                             data=f,
                             file_name="Formatted_Ready_MCQs.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
                             key="dl_t2"
                         )
                 except Exception as e:
