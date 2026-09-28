@@ -10,21 +10,56 @@ st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        #header {visibility: hidden;}
         .block-container {
             padding-top: 2rem;
             padding-bottom: 2rem;
         }
+        
+        /* 1. Space between the tabs */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 24px;
+            gap: 15px;
         }
+        
+        /* 2. Base styling for all tabs (Bigger, bolder, structural) */
         .stTabs [data-baseweb="tab"] {
-            height: 50px;
+            height: 55px;
             white-space: pre-wrap;
-            background-color: transparent;
-            border-radius: 4px;
-            font-size: 16px;
-            font-weight: 600;
+            background-color: rgba(128, 128, 128, 0.05); /* Subtle grey background for inactive tabs */
+            border-radius: 8px 8px 0px 0px; /* Rounded top corners like a folder */
+            font-size: 18px; /* Larger font */
+            font-weight: 700;
+            padding: 10px 24px;
+            border: 1px solid rgba(128, 128, 128, 0.2);
+            border-bottom: none;
+            transition: all 0.2s ease-in-out;
+        }
+        
+        /* 3. Hover effect for inactive tabs */
+        .stTabs [data-baseweb="tab"]:hover {
+            background-color: rgba(128, 128, 128, 0.15);
+        }
+
+        /* 4. Custom Styling for Tab 1 (✨ Generate New MCQs) - Green Theme */
+        .stTabs [data-baseweb="tab"]:nth-child(1)[aria-selected="true"] {
+            background-color: rgba(76, 175, 80, 0.1) !important;
+            border-top: 4px solid #4CAF50 !important;
+            border-left: 1px solid #4CAF50 !important;
+            border-right: 1px solid #4CAF50 !important;
+            color: #4CAF50 !important;
+        }
+
+        /* 5. Custom Styling for Tab 2 (📋 Format Existing) - Blue Theme */
+        .stTabs [data-baseweb="tab"]:nth-child(2)[aria-selected="true"] {
+            background-color: rgba(33, 150, 243, 0.1) !important;
+            border-top: 4px solid #2196F3 !important;
+            border-left: 1px solid #2196F3 !important;
+            border-right: 1px solid #2196F3 !important;
+            color: #2196F3 !important;
+        }
+        
+        /* Remove Streamlit's default red bottom border on active tabs */
+        .stTabs [data-baseweb="tab-border"] {
+            display: none;
         }
     </style>
 """, unsafe_allow_html=True)
