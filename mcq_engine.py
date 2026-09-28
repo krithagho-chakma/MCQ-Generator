@@ -61,6 +61,11 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     
     CRITICAL INSTRUCTION FOR IMAGES:
     If the source text contains markdown image links (e.g., ![image](media/img.png) or ![alt](word/media/image1.jpeg)), you MUST preserve them exactly as they appear. Place them in the relevant JSON field (usually "question_title" or "solution_body"). Never modify, translate, or delete the image file paths.
+
+    CRITICAL INSTRUCTION FOR DATA TABLES:
+    If the source text contains data tables (formatted in Markdown like |---|---|), you MUST convert them into basic HTML tables (e.g., <table border='1'><tr><td>...</td></tr></table>) inside the JSON string. 
+    - Do NOT use Markdown tables in your output.
+    - Write the ENTIRE HTML table on a SINGLE LINE (do not use \n characters inside the HTML table) so it does not break the JSON string or downstream formatting.
     
     CRITICAL INSTRUCTIONS FOR DIFFICULTY LEVEL:
     You must generate EXACTLY:
@@ -140,6 +145,11 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
 
     CRITICAL INSTRUCTION FOR IMAGES:
     If the source text contains markdown image links (e.g., ![image](media/img.png) or ![alt](word/media/image1.jpeg)), you MUST preserve them exactly as they appear. Place them in the relevant JSON field (usually "question_title" or "solution_body"). Never modify, translate, or delete the image file paths.
+    
+    CRITICAL INSTRUCTION FOR DATA TABLES:
+    If the source text contains data tables (formatted in Markdown like |---|---|), you MUST convert them into basic HTML tables (e.g., <table border='1'><tr><td>...</td></tr></table>) inside the JSON string. 
+    - Do NOT use Markdown tables in your output.
+    - Write the ENTIRE HTML table on a SINGLE LINE (do not use \n characters inside the HTML table) so it does not break the JSON string or downstream formatting.
     
     CRITICAL INSTRUCTION FOR THE 'topics' FIELD:
     Here is a list of allowed topics: {user_topics}
@@ -235,6 +245,22 @@ def process_html_images(text):
     
     return cleaned
 
+def safe_newline_to_br(text):
+    """Replaces \n with <br> EXCEPT when the \n is inside an HTML table."""
+    text_str = str(text)
+    
+    # If there's no table, safely replace all newlines
+    if "<table" not in text_str.lower():
+        return text_str.replace('\n', '<br>')
+        
+    # If there is a table, split by table tags and only replace \n outside of them
+    parts = re.split(r'(<table.*?</table>)', text_str, flags=re.IGNORECASE | re.DOTALL)
+    for i, part in enumerate(parts):
+        if not part.lower().startswith("<table"):
+            parts[i] = part.replace('\n', '<br>')
+            
+    return "".join(parts)
+
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     html = "<h1>Generated MCQs</h1>\n<table border='1'>\n"
     html += "<tr><th>Sl no.</th><th>Question Title</th><th>Option A</th><th>Option B</th><th>Option C</th><th>Option D</th><th>Solution Body</th><th>Correct Option</th><th>Subject</th><th>Chapter</th><th>Topics</th><th>Question Category</th><th>Difficulty Level</th></tr>\n"
@@ -243,8 +269,9 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
         html += "<tr>"
         html += f"<td>{mcq.get('sl_no', '')}</td>"
         
-        # Process images and remove dimension tags in title
-        q_title = process_html_images(mcq.get('question_title', ''))
+        # Process images and tables in the title
+        q_title = safe_newline_to_br(mcq.get('question_title', ''))
+        q_title = process_html_images(q_title)
         html += f"<td>{q_title}</td>"
         
         # Process images in options
@@ -253,8 +280,8 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
         html += f"<td>{process_html_images(mcq.get('C', ''))}</td>"
         html += f"<td>{process_html_images(mcq.get('D', ''))}</td>"
         
-        # Process line breaks AND images in solution body
-        sol_body = str(mcq.get('solution_body', '')).replace('\n', '<br>')
+        # Process line breaks, tables, AND images in solution body safely
+        sol_body = safe_newline_to_br(mcq.get('solution_body', ''))
         sol_body = process_html_images(sol_body)
         html += f"<td>{sol_body}</td>"
         
