@@ -217,7 +217,7 @@ with tab1:
     st.info(f"Total questions to generate: {total_q}")
 
     if st.button("Generate MCQs"):
-        if not user_api_key:
+        if not api_key_input:
             st.error("Please enter your API Key in the sidebar first!")
         if total_q == 0:
             st.error("Please specify at least one question to generate.")
@@ -266,7 +266,7 @@ with tab2:
     )
 
     if st.button("Format Existing MCQs", key="btn_t2"):
-        if not user_api_key:
+        if not api_key_input:
             st.error("Please configure your API Key in the sidebar.")
         elif not uploaded_file_t2 and not raw_text_t2:
             st.error("Please provide your raw MCQs in the text box or upload a file.")
