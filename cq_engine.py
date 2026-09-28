@@ -4,12 +4,6 @@ import json
 import PyPDF2
 from docx import Document
 
-# Initialize session state variables specific to CQs
-if "cq_data_t1" not in st.session_state:
-    st.session_state["cq_data_t1"] = None
-if "cq_data_t2" not in st.session_state:
-    st.session_state["cq_data_t2"] = None
-
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
@@ -111,6 +105,11 @@ def create_cq_docx(cq_data, output_filename="CQs.docx"):
     doc.save(output_filename)
 
 def run_cq_interface(model_choice, api_key_input):
+    # Initialize session state variables specific to CQs
+    if "cq_data_t1" not in st.session_state:
+        st.session_state["cq_data_t1"] = None
+    if "cq_data_t2" not in st.session_state:
+        st.session_state["cq_data_t2"] = None
     tab1, tab2 = st.tabs(["✨ Generate New CQs", "📋 Format Existing CQs"])
     
     with tab1:
