@@ -197,19 +197,35 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
 def process_html_images(text):
-    """Converts Markdown images ![alt](path){attributes} to clean HTML <img> tags, 
-    erasing any leftover Pandoc attribute blocks like {width="..."}."""
+    """Converts Markdown images to HTML, locks width to 2 inches, 
+    and aggressively annihilates multi-line Pandoc artifacts."""
     text_str = str(text)
     
-    # 1. Match ![alt](path) AND any attached Pandoc curly brace block {width="..." height="..."}
-    cleaned = re.sub(
-        r'!\[.*?\]\((.*?)\)(?:\s*\{.*?\})?', 
-        r'<img src="\1" width="250" />', 
-        text_str
-    )
+    def replacer(match):
+        img_path = match.group(1).strip()
+        mime_type, _ = mimetypes.guess_type(img_path)
+        if not mime_type:
+            mime_type = "image/png"
+            
+        if img_path in st.session_state["image_cache"]:
+            b64 = st.session_state["image_cache"][img_path]
+            return f'<img src="data:{mime_type};base64,{b64}" width="2in" />'
+            
+        if os.path.exists(img_path):
+            with open(img_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            st.session_state["image_cache"][img_path] = b64
+            return f'<img src="data:{mime_type};base64,{b64}" width="2in" />'
+            
+        return f'<img src="{img_path}" width="2in" />'
+
+    # 1. Match images and their immediate dimension blocks (newline-aware)
+    # [^\]]* and [^)]+ are safer than .* to prevent swallowing whole paragraphs
+    cleaned = re.sub(r'!\[[^\]]*\]\([^)]+\)(?:\s*\{[^{}]*\})?', replacer, text_str, flags=re.DOTALL)
     
-    # 2. Safety cleanup: remove any standalone orphan {width="..."} or {height="..."} blocks
-    cleaned = re.sub(r'\{width=.*?\bheight=.*?\}|\{width=.*?\}|\{height=.*?\}', '', cleaned)
+    # 2. The Multi-Line Assassin: Hunts down ANY leftover curly brace block 
+    # that contains 'width' or 'height', ignoring line breaks entirely.
+    cleaned = re.sub(r'\{[^{}]*(?:width|height)[^{}]*\}', '', cleaned, flags=re.IGNORECASE | re.DOTALL)
     
     return cleaned
 
