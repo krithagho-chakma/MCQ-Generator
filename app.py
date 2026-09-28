@@ -15,51 +15,48 @@ st.markdown("""
             padding-bottom: 2rem;
         }
         
-        /* 1. Space between the tabs */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 15px;
+        /* 1. Base styling for all tabs */
+        button[data-baseweb="tab"] {
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            border-radius: 8px 8px 0px 0px !important;
+            padding: 10px 24px !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-bottom: none !important;
+            margin-right: 15px !important;
+            transition: all 0.2s ease-in-out !important;
         }
         
-        /* 2. Base styling for all tabs (Bigger, bolder, structural) */
-        .stTabs [data-baseweb="tab"] {
-            height: 55px;
-            white-space: pre-wrap;
-            background-color: rgba(128, 128, 128, 0.05); /* Subtle grey background for inactive tabs */
-            border-radius: 8px 8px 0px 0px; /* Rounded top corners like a folder */
-            font-size: 18px; /* Larger font */
-            font-weight: 700;
-            padding: 10px 24px;
-            border: 1px solid rgba(128, 128, 128, 0.2);
-            border-bottom: none;
-            transition: all 0.2s ease-in-out;
-        }
-        
-        /* 3. Hover effect for inactive tabs */
-        .stTabs [data-baseweb="tab"]:hover {
-            background-color: rgba(128, 128, 128, 0.15);
+        /* 2. Hover effect for inactive tabs */
+        button[data-baseweb="tab"]:hover {
+            background-color: rgba(255, 255, 255, 0.1) !important;
         }
 
-        /* 4. Custom Styling for Tab 1 (✨ Generate New MCQs) - Green Theme */
-        .stTabs [data-baseweb="tab"]:nth-child(1)[aria-selected="true"] {
-            background-color: rgba(76, 175, 80, 0.1) !important;
+        /* 3. Tab 1 (Generate) - Active Green */
+        button[data-baseweb="tab"][aria-selected="true"]:nth-of-type(1) {
+            background-color: rgba(76, 175, 80, 0.15) !important;
             border-top: 4px solid #4CAF50 !important;
             border-left: 1px solid #4CAF50 !important;
             border-right: 1px solid #4CAF50 !important;
             color: #4CAF50 !important;
         }
 
-        /* 5. Custom Styling for Tab 2 (📋 Format Existing) - Blue Theme */
-        .stTabs [data-baseweb="tab"]:nth-child(2)[aria-selected="true"] {
-            background-color: rgba(33, 150, 243, 0.1) !important;
+        /* 4. Tab 2 (Format) - Active Blue */
+        button[data-baseweb="tab"][aria-selected="true"]:nth-of-type(2) {
+            background-color: rgba(33, 150, 243, 0.15) !important;
             border-top: 4px solid #2196F3 !important;
             border-left: 1px solid #2196F3 !important;
             border-right: 1px solid #2196F3 !important;
             color: #2196F3 !important;
         }
         
-        /* Remove Streamlit's default red bottom border on active tabs */
-        .stTabs [data-baseweb="tab-border"] {
-            display: none;
+        /* 5. Hide Streamlit's default animated bottom border */
+        div[data-baseweb="tab-highlight"] {
+            display: none !important;
+        }
+        div[data-baseweb="tab-border"] {
+            display: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
