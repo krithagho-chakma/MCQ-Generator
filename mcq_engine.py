@@ -64,7 +64,7 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
     ব্যাখ্যা: কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
 
-    Output the result STRICTLY as a JSON array of objects. Do not include markdown formatting like ```json.
+    Output the result STRICTLY as a JSON array of objects.
     Each object must have the following exact keys:
     "sl_no", "question_title", "A", "B", "C", "D", 
     "solution_body", "correct_option", "subject", "chapter", "topics", 
