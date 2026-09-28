@@ -6,6 +6,8 @@ import pypandoc
 import os
 import shutil
 import re
+import base64
+import mimetypes
 import PyPDF2
 from docx import Document
 
