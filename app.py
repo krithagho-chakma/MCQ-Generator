@@ -10,7 +10,7 @@ st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {visibility: hidden;}
+        #header {visibility: hidden;}
         .block-container {
             padding-top: 2rem;
             padding-bottom: 2rem;
