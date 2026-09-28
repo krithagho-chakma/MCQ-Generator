@@ -115,8 +115,9 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     SPECIAL USER INSTRUCTIONS (CRITICAL):
     {special_instructions if special_instructions else "None provided. Follow standard parsing."}
 
-    Output STRICTLY a JSON array of objects with exact keys:
-    "sl_no", "question_title", "option_a", "option_b", "option_c", "option_d", 
+    Output the result STRICTLY as a JSON array of objects. Do not include markdown formatting like ```json.
+    Each object must have the following exact keys:
+    "sl_no", "question_title", "A", "B", "C", "D", 
     "solution_body", "correct_option", "subject", "chapter", "topics", 
     "question_category", "difficulty_level".
 
