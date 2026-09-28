@@ -204,8 +204,13 @@ def process_html_images(text):
     text_str = str(text)
     
     def replacer(match):
-        # group(1) now correctly captures the file path inside the parentheses
         img_path = match.group(1).strip()
+        
+        # --- THE FIX: Self-healing memory cache ---
+        # If the app forgot the cache, rebuild it instantly before it crashes.
+        if "image_cache" not in st.session_state:
+            st.session_state["image_cache"] = {}
+            
         mime_type, _ = mimetypes.guess_type(img_path)
         if not mime_type:
             mime_type = "image/png"
@@ -222,7 +227,7 @@ def process_html_images(text):
             
         return f'<img src="{img_path}" width="2in" />'
 
-    # 1. FIXED: Added capturing parentheses ( ) around [^)]+ so group(1) exists!
+    # 1. Match images and their immediate dimension blocks
     cleaned = re.sub(r'!\[[^\]]*\]\(([^)]+)\)(?:\s*\{[^{}]*\})?', replacer, text_str, flags=re.DOTALL)
     
     # 2. The Multi-Line Assassin: Hunts down ANY leftover curly brace block 
