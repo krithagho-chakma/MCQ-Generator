@@ -55,6 +55,15 @@ def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard):
     Here is a list of allowed topics: {user_topics}
     For the "topics" field in each question, you MUST select EXACTLY ONE topic from the list above that best fits the question. Do not invent any new topics.
 
+    CRITICAL INSTRUCTION FOR 'solution_body':
+    The "solution_body" field MUST follow this exact 2-line format:
+    Line 1: The exact text of the correct option (DO NOT include sequence identifiers like 'A.', 'B.', 'Option A', '১.', etc.).
+    Line 2: A clear, detailed explanation of why this answer is correct.
+
+    Example format for solution_body:
+    "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
+    কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
+
     Output the result STRICTLY as a JSON array of objects. Do not include markdown formatting like ```json.
     Each object must have the following exact keys:
     "sl_no", "question_title", "A", "B", "C", "D", 
@@ -88,6 +97,15 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     3. Extract the Question Title, Option A, Option B, Option C, Option D, Correct Option, and Solution Body (if solution body isn't provided, create a brief accurate explanation).
     4. If 'topics' are provided in the list [{user_topics}], select the best fitting one. Otherwise, infer an accurate topic name.
     5. Infer appropriate "subject", "chapter", "question_category" (e.g., Board, Model Test), and "difficulty_level" (Easy, Medium, Hard) for each question.
+
+    CRITICAL INSTRUCTION FOR 'solution_body':
+    The "solution_body" field MUST follow this exact 2-line format:
+    Line 1: The exact text of the correct option (DO NOT include sequence identifiers like 'A.', 'B.', 'Option A', '১.', etc.).
+    Line 2: A clear, detailed explanation of why this answer is correct.
+
+    Example format for solution_body:
+    "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
+    কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
     
     SPECIAL USER INSTRUCTIONS (CRITICAL):
     {special_instructions if special_instructions else "None provided. Follow standard parsing."}
