@@ -39,12 +39,25 @@ st.sidebar.markdown("---")
 app_mode = st.sidebar.radio("🔀 Select Engine Mode:", ["📚 MCQ Engine", "✍️ CQ Engine"])
 st.sidebar.markdown("---")
 
+# --- NEW: Interactive API Key Guide ---
 api_key_input = st.sidebar.text_input(
     "🔑 Gemini API Key:", 
     value=st.session_state["user_api_key"], 
     type="password",
     help="Enter your Google AI Studio API key to power the engine."
 )
+
+with st.sidebar.expander("ℹ️ How to get a free API key?"):
+    st.markdown("""
+    **Step-by-step Guide:**
+    1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
+    2. Sign in with your standard Google account.
+    3. Click the blue **Create API key** button.
+    4. Select a project (or create a new one) and generate the key.
+    5. **Copy** the generated key and **paste** it in the box above.
+    
+    *Note: The Gemini 3.7 Flash model provides up to 1,500 free requests per day!*
+    """)
 
 if api_key_input:
     st.session_state["user_api_key"] = api_key_input
