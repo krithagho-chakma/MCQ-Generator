@@ -58,10 +58,12 @@ def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard):
     CRITICAL INSTRUCTION FOR 'solution_body':
     The "solution_body" field MUST follow this exact 2-line format:
     Line 1: The exact text of the correct option (DO NOT include sequence identifiers like 'A.', 'B.', 'Option A', '১.', etc.).
+    
     Line 2: A clear, detailed explanation of why this answer is correct.
 
     Example format for solution_body:
     "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
+    
     কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
 
     Output the result STRICTLY as a JSON array of objects. Do not include markdown formatting like ```json.
@@ -101,10 +103,12 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     CRITICAL INSTRUCTION FOR 'solution_body':
     The "solution_body" field MUST follow this exact 2-line format:
     Line 1: The exact text of the correct option (DO NOT include sequence identifiers like 'A.', 'B.', 'Option A', '১.', etc.).
+    
     Line 2: A clear, detailed explanation of why this answer is correct.
 
     Example format for solution_body:
     "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
+    
     কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
     
     SPECIAL USER INSTRUCTIONS (CRITICAL):
