@@ -11,25 +11,30 @@ from docx import Document
 
 # --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
+    # Clean up old temporary folders from PREVIOUS uploads before extracting new ones
+    if os.path.exists("media"): shutil.rmtree("media")
+    if os.path.exists("word"): shutil.rmtree("word")
+    
     os.makedirs("media", exist_ok=True)
     with open("temp.pdf", "wb") as f:
         f.write(pdf_file.read())
         
-    # write_images=True forces it to save the physical images to the "media" folder
     text = pymupdf4llm.to_markdown("temp.pdf", write_images=True, image_path="media")
     os.remove("temp.pdf")
     return text
 
 def extract_text_from_docx(docx_file):
+    # Clean up old temporary folders from PREVIOUS uploads before extracting new ones
+    if os.path.exists("media"): shutil.rmtree("media")
+    if os.path.exists("word"): shutil.rmtree("word")
+    
     with open("temp.docx", "wb") as f:
         f.write(docx_file.read())
         
-    # --extract-media=. tells Pandoc to rip images out of the DOCX and save them locally 
-    # (usually creates a 'word/media' or 'media' folder)
     text = pypandoc.convert_file("temp.docx", "markdown", extra_args=["--extract-media=."])
     os.remove("temp.docx")
     return text
-
+    
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
@@ -192,9 +197,21 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
 def process_html_images(text):
-    """Finds Markdown images ![alt](path) and converts them to HTML <img> tags."""
-    # Limits width to 300px so massive images don't break the Word table layout
-    return re.sub(r'!\[.*?\]\((.*?)\)', r'<img src="\1" width="300" />', str(text))
+    """Converts Markdown images ![alt](path){attributes} to clean HTML <img> tags, 
+    erasing any leftover Pandoc attribute blocks like {width="..."}."""
+    text_str = str(text)
+    
+    # 1. Match ![alt](path) AND any attached Pandoc curly brace block {width="..." height="..."}
+    cleaned = re.sub(
+        r'!\[.*?\]\((.*?)\)(?:\s*\{.*?\})?', 
+        r'<img src="\1" width="250" />', 
+        text_str
+    )
+    
+    # 2. Safety cleanup: remove any standalone orphan {width="..."} or {height="..."} blocks
+    cleaned = re.sub(r'\{width=.*?\bheight=.*?\}|\{width=.*?\}|\{height=.*?\}', '', cleaned)
+    
+    return cleaned
 
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     html = "<h1>Generated MCQs</h1>\n<table border='1'>\n"
@@ -204,17 +221,17 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
         html += "<tr>"
         html += f"<td>{mcq.get('sl_no', '')}</td>"
         
-        # Process images in the title
+        # Process images and remove dimension tags in title
         q_title = process_html_images(mcq.get('question_title', ''))
         html += f"<td>{q_title}</td>"
         
-        # Process images in options (just in case)
+        # Process images in options
         html += f"<td>{process_html_images(mcq.get('A', ''))}</td>"
         html += f"<td>{process_html_images(mcq.get('B', ''))}</td>"
         html += f"<td>{process_html_images(mcq.get('C', ''))}</td>"
         html += f"<td>{process_html_images(mcq.get('D', ''))}</td>"
         
-        # Process line breaks AND images in the solution body
+        # Process line breaks AND images in solution body
         sol_body = str(mcq.get('solution_body', '')).replace('\n', '<br>')
         sol_body = process_html_images(sol_body)
         html += f"<td>{sol_body}</td>"
@@ -229,16 +246,12 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     
     html += "</table>"
     
-    # Convert to DOCX
+    # Convert HTML + LaTeX to Word document
     pypandoc.convert_text(html, 'docx', format='html+tex_math_dollars', outputfile=output_filename)
     
-    # --- TEMPORARY FILE CLEANUP ---
-    # Delete the extracted image folders so they don't clog up your server storage
-    if os.path.exists("media"):
-        shutil.rmtree("media")
-    if os.path.exists("word"): # Pandoc often extracts DOCX media to a 'word/media' folder
-        shutil.rmtree("word")
-        
+    # NOTE: Do NOT delete media folders here! 
+    # Keeping them on disk allows infinite re-downloads and interactive cell editing.
+
 def run_mcq_interface(model_choice, api_key_input):
     # Initialize session state for API Key and Table Data
     if "user_api_key" not in st.session_state:
