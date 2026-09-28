@@ -4,15 +4,6 @@ import json
 import PyPDF2
 from docx import Document
 
-# --- 2. PERSISTENT SESSION STATE ---
-# Initialize session state for API Key and Table Data
-if "user_api_key" not in st.session_state:
-    st.session_state["user_api_key"] = ""
-if "mcq_data_t1" not in st.session_state:
-    st.session_state["mcq_data_t1"] = None
-if "mcq_data_t2" not in st.session_state:
-    st.session_state["mcq_data_t2"] = None
-
 # --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
@@ -170,6 +161,13 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     doc.save(output_filename)
 
 def run_mcq_interface(model_choice, api_key_input):
+    # Initialize session state for API Key and Table Data
+    if "user_api_key" not in st.session_state:
+        st.session_state["user_api_key"] = ""
+    if "mcq_data_t1" not in st.session_state:
+        st.session_state["mcq_data_t1"] = None
+    if "mcq_data_t2" not in st.session_state:
+        st.session_state["mcq_data_t2"] = None
 # Create two clean tabs
     tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing MCQs"])
     
