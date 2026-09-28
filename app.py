@@ -178,7 +178,7 @@ with tab1:
     elif model_choice == "gemini-3.5-flash-lite":
         st.success("✅ **Free Tier Limit:** 1,500 requests per day. Ultra-fast for simpler, high-volume tasks.")
     elif model_choice == "gemini-3.1-flash-lite":
-    st.success("✅ **Free Tier Limit:** 1,500 requests per day. High efficiency and speed for basic processing.")
+        st.success("✅ **Free Tier Limit:** 1,500 requests per day. High efficiency and speed for basic processing.")
 
     # --- PREVIOUS INPUTS ---
 
