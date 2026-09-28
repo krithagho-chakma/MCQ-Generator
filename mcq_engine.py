@@ -309,52 +309,6 @@ def run_mcq_interface(model_choice, api_key_input):
         st.session_state["mcq_data_t1"] = None
     if "mcq_data_t2" not in st.session_state:
         st.session_state["mcq_data_t2"] = None
-
-    # --- INJECT LOCAL CSS FOR TABS ---
-    st.markdown("""
-        <style>
-            /* 1. Base styling for all tabs */
-            button[data-testid="stTab"] {
-                font-size: 18px !important;
-                font-weight: 700 !important;
-                border-radius: 8px 8px 0px 0px !important;
-                padding: 10px 24px !important;
-                background-color: rgba(128, 128, 128, 0.05) !important;
-                border: 1px solid rgba(128, 128, 128, 0.2) !important;
-                border-bottom: none !important;
-                margin-right: 10px !important;
-                transition: all 0.2s ease-in-out !important;
-            }
-            
-            /* 2. Hover effect for inactive tabs */
-            button[data-testid="stTab"]:hover {
-                background-color: rgba(128, 128, 128, 0.15) !important;
-            }
-
-            /* 3. Tab 1 (Generate) - Active Green */
-            button[data-testid="stTab"][aria-selected="true"]:nth-of-type(1) {
-                background-color: rgba(76, 175, 80, 0.15) !important;
-                border-top: 4px solid #4CAF50 !important;
-                border-left: 1px solid #4CAF50 !important;
-                border-right: 1px solid #4CAF50 !important;
-                color: #4CAF50 !important;
-            }
-
-            /* 4. Tab 2 (Format) - Active Blue */
-            button[data-testid="stTab"][aria-selected="true"]:nth-of-type(2) {
-                background-color: rgba(33, 150, 243, 0.15) !important;
-                border-top: 4px solid #2196F3 !important;
-                border-left: 1px solid #2196F3 !important;
-                border-right: 1px solid #2196F3 !important;
-                color: #2196F3 !important;
-            }
-            
-            /* 5. Hide Streamlit's default animated underline */
-            div[data-testid="stTabIndicator"] {
-                display: none !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
     
     # Create two clean tabs
     tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing MCQs"])
