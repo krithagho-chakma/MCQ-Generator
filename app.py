@@ -45,22 +45,25 @@ def extract_text_from_docx(docx_file):
             text += para.text + "\n"
     return text
 
-def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard, selected_model):
-    """Sends the text, topics, and difficulty distribution using the chosen SDK."""
+def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
+    """Sends text, topic limits, custom generation instructions, and difficulty distribution using the chosen SDK."""
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
     
     # Dynamic instruction based on whether context text was provided
     if context_text.strip():
-        source_instruction = "Based on the following Context Text, generate"
+        source_instruction = "Based on the provided Context Text and user instructions, generate"
         context_block = f"Context Text:\n{context_text}"
     else:
-        source_instruction = "Based on your expert general knowledge of the provided topics, generate"
-        context_block = "No context text provided. Generate purely based on the requested topics."
+        source_instruction = "Based on your expert general knowledge and user instructions, generate"
+        context_block = "No context text provided. Generate purely based on the requested topics and instructions."
     
     prompt = f"""
     Act as an expert educator. {source_instruction} exactly {total_questions} board-standard multiple-choice questions.
     
+    SPECIAL USER GENERATION INSTRUCTIONS (CRITICAL):
+    {custom_instructions if custom_instructions else "None provided. Follow standard board-level question generation."}
+
     CRITICAL INSTRUCTIONS FOR DIFFICULTY LEVEL:
     You must generate EXACTLY:
     - {num_easy} questions where "difficulty_level" is "Easy"
@@ -68,10 +71,10 @@ def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard, sel
     - {num_hard} questions where "difficulty_level" is "Hard"
     Do not use any other words for difficulty level.
 
-    CRITICAL INSTRUCTION FOR THE 'topics' FIELD:
-    Here is a list of allowed topics: {user_topics}
-    For the "topics" field in each question, you MUST select EXACTLY ONE topic from the list above that best fits the question. Do not invent any new topics.
-    DO NOT include sequence identifiers like '1.0', '2.1', etc.
+    CRITICAL INSTRUCTION FOR THE 'topics' COLUMN FIELD:
+    Here is the list of allowed topic names: {user_topics}
+    For the "topics" field in each question object, you MUST select EXACTLY ONE topic from the list above that best fits the generated question. Do not invent any new topics.
+    DO NOT include sequence identifiers like '1.0', '2.1', etc. in the topic field.
 
     CRITICAL INSTRUCTION FOR 'solution_body':
     The "solution_body" field MUST follow this exact 2-line format:
@@ -190,8 +193,8 @@ tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing Raw MCQs"])
 
 # ================= TAB 1: GENERATE NEW MCQS =================
 with tab1:
-    st.write("Upload a source document, define your topics, and configure difficulty levels.")
-    # --- NEW: EXPANDED MODEL SELECTION UI ---
+    st.write("Configure parameters, upload context (optional), and generate new MCQs.")
+    
     st.subheader("1. AI Model Selection")
     model_choice = st.selectbox(
         "Choose which Gemini model to use:",
@@ -203,10 +206,9 @@ with tab1:
             "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite"
         ],
-        index=1 # Sets gemini-3.7-flash as the default choice
+        index=1
     )
 
-    # Provide the official free-tier quota details dynamically
     if model_choice == "gemini-3.8-flash":
         st.warning("⚠️ **Free Tier Limit:** Only 20 requests per day. You will hit limits very quickly.")
     elif model_choice == "gemini-3.7-flash":
@@ -220,14 +222,22 @@ with tab1:
     elif model_choice == "gemini-3.1-flash-lite":
         st.success("✅ **Free Tier Limit:** 1,500 requests per day. High efficiency and speed for basic processing.")
 
-    # --- INPUTS ---
     st.subheader("2. Source Material (Optional)")
-    st.info("If left blank, the AI will generate questions based purely on the topics provided below.")
+    st.info("If left blank, the AI will generate questions based purely on your topics and instructions below.")
     uploaded_file = st.file_uploader("Upload Source Document (PDF or DOCX)", type=["pdf", "docx"])
     raw_text = st.text_area("Or paste raw source text here")
     
     st.subheader("3. Question Parameters")
-    topics_input = st.text_input("Enter specific topics (comma-separated)", placeholder="e.g., Hardware, Memory, Super Computers")
+    topics_input = st.text_input(
+        "Allowed Topics for Table Mapping (comma-separated)", 
+        placeholder="e.g., Hardware, Memory, Super Computers"
+    )
+    
+    custom_instructions = st.text_area(
+        "Custom Generation Instructions for AI (Optional)", 
+        placeholder="e.g., 'Focus heavily on numerical problems', 'Generate questions in Bengali', 'Create questions matching Class 10 Board exam standards'",
+        key="t1_custom_instructions"
+    )
 
     st.write("Difficulty Breakdown (Number of Questions)")
     col1, col2, col3 = st.columns(3)
@@ -247,8 +257,7 @@ with tab1:
         elif total_q == 0:
             st.error("Please specify at least one question to generate.")
         elif not topics_input:
-            # We now mandate topics_input if there is no text, so the AI knows what to write about
-            st.error("Please provide at least one topic for the AI to generate questions about.")
+            st.error("Please provide at least one topic for table mapping.")
         else:
             with st.spinner(f"Generating {total_q} questions (this takes a minute)..."):
                 text_to_process = ""
@@ -261,7 +270,15 @@ with tab1:
                     text_to_process = raw_text
                     
                 try:
-                    mcq_json = generate_mcqs(text_to_process, topics_input, num_easy, num_medium, num_hard, model_choice)
+                    mcq_json = generate_mcqs(
+                        text_to_process, 
+                        topics_input, 
+                        custom_instructions, 
+                        num_easy, 
+                        num_medium, 
+                        num_hard, 
+                        model_choice
+                    )
                     create_mcq_docx(mcq_json, "Generated_MCQs.docx")
                     
                     st.success("Successfully generated!")
