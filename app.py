@@ -50,8 +50,16 @@ def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard, sel
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
     
+    # Dynamic instruction based on whether context text was provided
+    if context_text.strip():
+        source_instruction = "Based on the following Context Text, generate"
+        context_block = f"Context Text:\n{context_text}"
+    else:
+        source_instruction = "Based on your expert general knowledge of the provided topics, generate"
+        context_block = "No context text provided. Generate purely based on the requested topics."
+    
     prompt = f"""
-    Act as an expert educator. Based on the following Context Text, generate exactly {total_questions} board-standard multiple-choice questions.
+    Act as an expert educator. {source_instruction} exactly {total_questions} board-standard multiple-choice questions.
     
     CRITICAL INSTRUCTIONS FOR DIFFICULTY LEVEL:
     You must generate EXACTLY:
@@ -80,8 +88,7 @@ def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard, sel
     "solution_body", "correct_option", "subject", "chapter", "topics", 
     "question_category", "difficulty_level".
     
-    Context Text:
-    {context_text}
+    {context_block}
     """
     
     response = model.generate_content(
@@ -213,13 +220,16 @@ with tab1:
     elif model_choice == "gemini-3.1-flash-lite":
         st.success("✅ **Free Tier Limit:** 1,500 requests per day. High efficiency and speed for basic processing.")
 
-    # --- PREVIOUS INPUTS ---
-
-    uploaded_file = st.file_uploader("2. Upload Source Document (PDF or DOCX)", type=["pdf", "docx"])
+    # --- INPUTS ---
+    st.subheader("2. Source Material (Optional)")
+    st.info("If left blank, the AI will generate questions based purely on the topics provided below.")
+    uploaded_file = st.file_uploader("Upload Source Document (PDF or DOCX)", type=["pdf", "docx"])
     raw_text = st.text_area("Or paste raw source text here")
-    topics_input = st.text_input("3. Enter specific topics (comma-separated)", placeholder="e.g., Hardware, Memory, Super Computers")
+    
+    st.subheader("3. Question Parameters")
+    topics_input = st.text_input("Enter specific topics (comma-separated)", placeholder="e.g., Hardware, Memory, Super Computers")
 
-    st.write("4. Difficulty Breakdown (Number of Questions)")
+    st.write("Difficulty Breakdown (Number of Questions)")
     col1, col2, col3 = st.columns(3)
     with col1:
         num_easy = st.number_input("Easy", min_value=0, max_value=50, value=10)
@@ -237,11 +247,10 @@ with tab1:
         elif total_q == 0:
             st.error("Please specify at least one question to generate.")
         elif not topics_input:
-            st.error("Please provide at least one topic.")
-        elif not uploaded_file and not raw_text:
-            st.error("Please provide some source text or upload a document.")
+            # We now mandate topics_input if there is no text, so the AI knows what to write about
+            st.error("Please provide at least one topic for the AI to generate questions about.")
         else:
-            with st.spinner(f"Analyzing text and generating {total_q} questions (this takes a minute)..."):
+            with st.spinner(f"Generating {total_q} questions (this takes a minute)..."):
                 text_to_process = ""
                 if uploaded_file:
                     if uploaded_file.name.endswith('.pdf'):
