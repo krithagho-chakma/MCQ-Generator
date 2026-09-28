@@ -216,38 +216,40 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
 st.title("📚 MCQ Automation Engine")
 st.markdown("Automate the generation and formatting of board-standard multiple-choice questions.")
 
+# --- GLOBAL MODEL SELECTION ---
+with st.container(border=True):
+    st.markdown("#### 🤖 Global AI Model Selection")
+    model_choice = st.selectbox(
+        "Select the Gemini engine for this task:",
+        options=[
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite"
+        ],
+        index=1,
+        label_visibility="collapsed"
+    )
+
+    if model_choice == "gemini-3.8-flash":
+        st.caption("⚠️ **Free Tier Limit:** 20 requests per day.")
+    elif model_choice == "gemini-3.7-flash":
+        st.caption("💡 **Free Tier Limit:** 1,500 requests per day. (Recommended)")
+    elif model_choice == "gemini-3.6-flash":
+        st.caption("🚫 **Free Tier Limit:** Requires Pay-As-You-Go account.")
+    else:
+        st.caption("✅ **Free Tier Limit:** 1,500 requests per day.")
+
+st.markdown("<br>", unsafe_allow_html=True) # Spacer
+
 # Create two clean tabs
 tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing MCQs"])
 
 # ================= TAB 1: GENERATE NEW MCQS =================
 with tab1:
     
-    # Model Selection Container
-    with st.container(border=True):
-        st.markdown("#### 🤖 AI Model Selection")
-        model_choice = st.selectbox(
-            "Select the Gemini engine for this task:",
-            options=[
-                "gemini-3.8-flash",
-                "gemini-3.7-flash",
-                "gemini-3.6-flash",
-                "gemini-3.5-flash",
-                "gemini-3.5-flash-lite",
-                "gemini-3.1-flash-lite"
-            ],
-            index=1,
-            label_visibility="collapsed"
-        )
-
-        if model_choice == "gemini-3.8-flash":
-            st.caption("⚠️ **Free Tier Limit:** 20 requests per day.")
-        elif model_choice == "gemini-3.7-flash":
-            st.caption("💡 **Free Tier Limit:** 1,500 requests per day. (Recommended)")
-        elif model_choice == "gemini-3.6-flash":
-            st.caption("🚫 **Free Tier Limit:** Requires Pay-As-You-Go account.")
-        else:
-            st.caption("✅ **Free Tier Limit:** 1,500 requests per day.")
-
     # Source Material Container
     with st.container(border=True):
         st.markdown("#### 📄 1. Source Material (Optional)")
@@ -303,7 +305,7 @@ with tab1:
         elif not topics_input:
             st.error("Please provide at least one topic for table mapping.")
         else:
-            with st.spinner(f"Engine running... Generating {total_q} questions"):
+            with st.spinner(f"Engine running... Generating {total_q} questions using {model_choice}"):
                 text_to_process = ""
                 if uploaded_file:
                     if uploaded_file.name.endswith('.pdf'):
@@ -369,7 +371,7 @@ with tab2:
         elif not uploaded_file_t2 and not raw_text_t2:
             st.error("Please provide your raw MCQs in the text box or upload a document.")
         else:
-            with st.spinner("Parsing and reformatting questions..."):
+            with st.spinner(f"Parsing and reformatting questions using {model_choice}..."):
                 text_to_process = ""
                 if uploaded_file_t2:
                     if uploaded_file_t2.name.endswith('.pdf'):
