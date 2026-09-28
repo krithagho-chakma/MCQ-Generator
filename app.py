@@ -36,6 +36,15 @@ def extract_text_from_pdf(pdf_file):
             text += extracted + "\n"
     return text
 
+def extract_text_from_docx(docx_file):
+    """Reads the uploaded DOCX and pulls all the text out."""
+    doc = Document(docx_file)
+    text = ""
+    for para in doc.paragraphs:
+        if para.text:
+            text += para.text + "\n"
+    return text
+
 def generate_mcqs(context_text, user_topics, num_easy, num_medium, num_hard, selected_model):
     """Sends the text, topics, and difficulty distribution using the chosen SDK."""
     model = genai.GenerativeModel(selected_model)
@@ -206,7 +215,7 @@ with tab1:
 
     # --- PREVIOUS INPUTS ---
 
-    uploaded_file = st.file_uploader("2. Upload Source PDF", type="pdf")
+    uploaded_file = st.file_uploader("2. Upload Source Document (PDF or DOCX)", type=["pdf", "docx"])
     raw_text = st.text_area("Or paste raw source text here")
     topics_input = st.text_input("3. Enter specific topics (comma-separated)", placeholder="e.g., Hardware, Memory, Super Computers")
 
@@ -230,17 +239,19 @@ with tab1:
         elif not topics_input:
             st.error("Please provide at least one topic.")
         elif not uploaded_file and not raw_text:
-            st.error("Please provide some source text or upload a PDF.")
+            st.error("Please provide some source text or upload a document.")
         else:
             with st.spinner(f"Analyzing text and generating {total_q} questions (this takes a minute)..."):
                 text_to_process = ""
                 if uploaded_file:
-                    text_to_process = extract_text_from_pdf(uploaded_file)
+                    if uploaded_file.name.endswith('.pdf'):
+                        text_to_process = extract_text_from_pdf(uploaded_file)
+                    elif uploaded_file.name.endswith('.docx'):
+                        text_to_process = extract_text_from_docx(uploaded_file)
                 elif raw_text:
                     text_to_process = raw_text
                     
                 try:
-                    # Added model_choice here so the dropdown works correctly
                     mcq_json = generate_mcqs(text_to_process, topics_input, num_easy, num_medium, num_hard, model_choice)
                     create_mcq_docx(mcq_json, "Generated_MCQs.docx")
                     
@@ -261,7 +272,7 @@ with tab2:
     st.subheader("Convert & Reformat Pre-written MCQs")
     st.write("Paste your raw, unformatted questions or upload a document containing ready MCQs.")
     
-    uploaded_file_t2 = st.file_uploader("1. Upload Raw MCQs Document (PDF)", type="pdf", key="t2_pdf")
+    uploaded_file_t2 = st.file_uploader("1. Upload Raw MCQs Document (PDF or DOCX)", type=["pdf", "docx"], key="t2_pdf")
     raw_text_t2 = st.text_area("Or paste raw pre-written MCQs here", height=200, placeholder="1. What is CPU?\nA. Brain\nB. Memory\nC. Output\nD. Storage\nAnswer: A", key="t2_text")
     
     topics_input_t2 = st.text_input("2. Target Topics (Optional)", placeholder="e.g., Computer Basics, Hardware", key="t2_topics")
@@ -276,10 +287,18 @@ with tab2:
         if not api_key_input:
             st.error("Please configure your API Key in the sidebar.")
         elif not uploaded_file_t2 and not raw_text_t2:
-            st.error("Please provide your raw MCQs in the text box or upload a file.")
+            st.error("Please provide your raw MCQs in the text box or upload a document.")
         else:
             with st.spinner(f"Parsing and reformatting questions using {model_choice}..."):
-                text_to_process = extract_text_from_pdf(uploaded_file_t2) if uploaded_file_t2 else raw_text_t2
+                text_to_process = ""
+                if uploaded_file_t2:
+                    if uploaded_file_t2.name.endswith('.pdf'):
+                        text_to_process = extract_text_from_pdf(uploaded_file_t2)
+                    elif uploaded_file_t2.name.endswith('.docx'):
+                        text_to_process = extract_text_from_docx(uploaded_file_t2)
+                elif raw_text_t2:
+                    text_to_process = raw_text_t2
+                    
                 try:
                     mcq_json = parse_existing_mcqs(text_to_process, topics_input_t2, special_instructions, model_choice)
                     create_mcq_docx(mcq_json, "Formatted_Ready_MCQs.docx")
