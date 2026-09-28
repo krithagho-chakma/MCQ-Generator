@@ -102,11 +102,42 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
 st.title("Automated MCQ Generator")
 st.write("Upload a source document, define your topics, and configure difficulty levels.")
 
-uploaded_file = st.file_uploader("1. Upload Source PDF", type="pdf")
-raw_text = st.text_area("Or paste raw source text here")
-topics_input = st.text_input("2. Enter specific topics (comma-separated)", placeholder="e.g., Hardware, Memory, Super Computers")
+# --- NEW: EXPANDED MODEL SELECTION UI ---
+st.subheader("1. AI Model Selection")
+model_choice = st.selectbox(
+    "Choose which Gemini model to use:",
+    options=[
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite"
+    ],
+    index=1 # Sets gemini-3.7-flash as the default choice
+)
 
-st.write("3. Difficulty Breakdown (Number of Questions)")
+# Provide the official free-tier quota details dynamically
+if model_choice == "gemini-3.8-flash":
+    st.warning("⚠️ **Free Tier Limit:** Only 20 requests per day. You will hit limits very quickly.")
+elif model_choice == "gemini-3.7-flash":
+    st.info("💡 **Free Tier Limit:** 1,500 requests per day. Recommended for bulk generation.")
+elif model_choice == "gemini-3.6-flash":
+    st.error("🚫 **Free Tier Limit:** Not available on the Free Tier. Requires a Pay-As-You-Go billing account.")
+elif model_choice == "gemini-3.5-flash":
+    st.info("💡 **Free Tier Limit:** 1,500 requests per day. Fast and highly stable.")
+elif model_choice == "gemini-3.5-flash-lite":
+    st.success("✅ **Free Tier Limit:** 1,500 requests per day. Ultra-fast for simpler, high-volume tasks.")
+elif model_choice == "gemini-3.1-flash-lite":
+    st.success("✅ **Free Tier Limit:** 1,500 requests per day. High efficiency and speed for basic processing.")
+
+# --- PREVIOUS INPUTS ---
+
+uploaded_file = st.file_uploader("2. Upload Source PDF", type="pdf")
+raw_text = st.text_area("Or paste raw source text here")
+topics_input = st.text_input("3. Enter specific topics (comma-separated)", placeholder="e.g., Hardware, Memory, Super Computers")
+
+st.write("4. Difficulty Breakdown (Number of Questions)")
 col1, col2, col3 = st.columns(3)
 with col1:
     num_easy = st.number_input("Easy", min_value=0, max_value=50, value=10)
