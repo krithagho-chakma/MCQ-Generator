@@ -328,6 +328,11 @@ with tab1:
                     create_mcq_docx(mcq_json, "Generated_MCQs.docx")
                     
                     st.success("✨ Generation Complete!")
+
+                    # --- NEW PREVIEW PANEL ---
+                    with st.container(border=True):
+                        st.markdown("#### 👀 Preview of Generated Table")
+                        st.dataframe(mcq_json, use_container_width=True)
                     
                     with open("Generated_MCQs.docx", "rb") as file:
                         st.download_button(
@@ -386,6 +391,11 @@ with tab2:
                     create_mcq_docx(mcq_json, "Formatted_Ready_MCQs.docx")
                     
                     st.success("✨ Successfully reformatted into table format!")
+
+                    # --- NEW PREVIEW PANEL ---
+                    with st.container(border=True):
+                        st.markdown("#### 👀 Preview of Formatted Table")
+                        st.dataframe(mcq_json, use_container_width=True)
                     
                     with open("Formatted_Ready_MCQs.docx", "rb") as f:
                         st.download_button(
