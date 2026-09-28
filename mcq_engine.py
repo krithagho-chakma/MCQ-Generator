@@ -1,25 +1,26 @@
 import streamlit as st
 import google.generativeai as genai
 import json
+import pymupdf4llm
+import pypandoc
+import os
 import PyPDF2
 from docx import Document
 
 # --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
-    reader = PyPDF2.PdfReader(pdf_file)
-    text = ""
-    for page in reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted + "\n"
+    with open("temp.pdf", "wb") as f:
+        f.write(pdf_file.read())
+    text = pymupdf4llm.to_markdown("temp.pdf")
+    os.remove("temp.pdf")
     return text
 
 def extract_text_from_docx(docx_file):
-    doc = Document(docx_file)
-    text = ""
-    for para in doc.paragraphs:
-        if para.text:
-            text += para.text + "\n"
+    with open("temp.docx", "wb") as f:
+        f.write(docx_file.read())
+    # pypandoc reads the docx and converts native Word equations to $LaTeX$
+    text = pypandoc.convert_file("temp.docx", "markdown")
+    os.remove("temp.docx")
     return text
 
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
@@ -39,6 +40,9 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     SPECIAL USER GENERATION INSTRUCTIONS (CRITICAL):
     {custom_instructions if custom_instructions else "None provided. Follow standard board-level question generation."}
 
+    CRITICAL INSTRUCTION FOR MATH AND EQUATIONS:
+    If the source text contains mathematical equations, chemical formulas, or physics expressions, you MUST preserve them using standard LaTeX format. Use $ for inline math (e.g., $E=mc^2$) and $$ for display math. Do NOT use plain text approximations.
+    
     CRITICAL INSTRUCTIONS FOR DIFFICULTY LEVEL:
     You must generate EXACTLY:
     - {num_easy} questions where "difficulty_level" is "Easy"
@@ -49,7 +53,7 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     CRITICAL INSTRUCTION FOR THE 'topics' COLUMN FIELD:
     Here is the list of allowed topic names: {user_topics}
     For the "topics" field in each question object, you MUST select EXACTLY ONE topic from the list above that best fits the generated question. Do not invent any new topics.
-    DO NOT include sequence identifiers like '1.0', '2.1', etc. in the topic field.
+    DO NOT include sequence identifiers like '1.1', '2.1', etc. in the topic field.
 
     CRITICAL INSTRUCTION FOR 'solution_body':
     The "solution_body" field MUST follow this exact 2-line format:
@@ -91,6 +95,9 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     3. Extract the Question Title, Option A, Option B, Option C, Option D, Correct Option, and Solution Body (if solution body isn't provided, create a brief accurate explanation).
     4. Infer appropriate "subject", "chapter", "question_category" (e.g., Board, Model Test), and "difficulty_level" (Easy, Medium, Hard) for each question.
 
+    CRITICAL INSTRUCTION FOR MATH AND EQUATIONS:
+    If the source text contains mathematical equations, chemical formulas, or physics expressions, you MUST preserve them using standard LaTeX format. Use $ for inline math (e.g., $E=mc^2$) and $$ for display math. Do NOT use plain text approximations.
+
     CRITICAL INSTRUCTION FOR THE 'topics' FIELD:
     Here is a list of allowed topics: {user_topics}
     For the "topics" field in each question, you MUST select EXACTLY ONE topic from the list above that best fits the question. Do not invent any new topics.
@@ -125,41 +132,35 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     return json.loads(response.text)
 
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
-    doc = Document()
-    doc.add_heading('Generated MCQs', 0)
+    # Build an HTML table. Pandoc handles HTML-to-Word conversions flawlessly.
+    html = "<h1>Generated MCQs</h1>\n<table border='1'>\n"
+    html += "<tr><th>Sl no.</th><th>Question Title</th><th>Option A</th><th>Option B</th><th>Option C</th><th>Option D</th><th>Solution Body</th><th>Correct Option</th><th>Subject</th><th>Chapter</th><th>Topics</th><th>Question Category</th><th>Difficulty Level</th></tr>\n"
     
-    table = doc.add_table(rows=1, cols=13)
-    table.style = 'Table Grid'
-    
-    headers = [
-        "Sl no.", "Question Title", "Option A", "Option B", "Option C", 
-        "Option D", "Solution Body", "Correct Option", "Subject", 
-        "Chapter", "Topics", "Question Category", "Difficulty Level"
-    ]
-    
-    hdr_cells = table.rows[0].cells
-    for i, header in enumerate(headers):
-        hdr_cells[i].text = header
-        
     for mcq in mcq_data:
-        row_cells = table.add_row().cells
-        # Use .get() defensively with a string fallback just in case rows were added manually
-        row_cells[0].text = str(mcq.get("sl_no", ""))
-        row_cells[1].text = str(mcq.get("question_title", ""))
-        row_cells[2].text = str(mcq.get("A", ""))
-        row_cells[3].text = str(mcq.get("B", ""))
-        row_cells[4].text = str(mcq.get("C", ""))
-        row_cells[5].text = str(mcq.get("D", ""))
-        row_cells[6].text = str(mcq.get("solution_body", ""))
-        row_cells[7].text = str(mcq.get("correct_option", ""))
-        row_cells[8].text = str(mcq.get("subject", ""))
-        row_cells[9].text = str(mcq.get("chapter", ""))
-        row_cells[10].text = str(mcq.get("topics", ""))
-        row_cells[11].text = str(mcq.get("question_category", ""))
-        row_cells[12].text = str(mcq.get("difficulty_level", ""))
+        html += "<tr>"
+        html += f"<td>{mcq.get('sl_no', '')}</td>"
+        html += f"<td>{mcq.get('question_title', '')}</td>"
+        html += f"<td>{mcq.get('A', '')}</td>"
+        html += f"<td>{mcq.get('B', '')}</td>"
+        html += f"<td>{mcq.get('C', '')}</td>"
+        html += f"<td>{mcq.get('D', '')}</td>"
         
-    doc.save(output_filename)
-
+        # Replace python newline characters with HTML breaks for the 2-line solution body
+        sol_body = str(mcq.get('solution_body', '')).replace('\n', '<br>')
+        html += f"<td>{sol_body}</td>"
+        
+        html += f"<td>{mcq.get('correct_option', '')}</td>"
+        html += f"<td>{mcq.get('subject', '')}</td>"
+        html += f"<td>{mcq.get('chapter', '')}</td>"
+        html += f"<td>{mcq.get('topics', '')}</td>"
+        html += f"<td>{mcq.get('question_category', '')}</td>"
+        html += f"<td>{mcq.get('difficulty_level', '')}</td>"
+        html += "</tr>\n"
+    
+    html += "</table>"
+    
+    # format='html+tex_math_dollars' tells Pandoc to render the HTML table but also parse $x^2$ as equations
+    pypandoc.convert_text(html, 'docx', format='html+tex_math_dollars', outputfile=output_filename)
 def run_mcq_interface(model_choice, api_key_input):
     # Initialize session state for API Key and Table Data
     if "user_api_key" not in st.session_state:
