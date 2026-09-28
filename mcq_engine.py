@@ -80,7 +80,16 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
         )
     )
     
-    return json.loads(response.text)
+# --- NEW CLEANING LOGIC ---
+    raw_output = response.text.strip()
+    start_idx = raw_output.find('[')
+    end_idx = raw_output.rfind(']') + 1
+    
+    if start_idx != -1 and end_idx != -1:
+        clean_json = raw_output[start_idx:end_idx]
+        return json.loads(clean_json)
+    else:
+        return json.loads(raw_output) # Fallback
 
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
     model = genai.GenerativeModel(selected_model)
@@ -129,7 +138,16 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json")
     )
-    return json.loads(response.text)
+# --- NEW CLEANING LOGIC ---
+    raw_output = response.text.strip()
+    start_idx = raw_output.find('[')
+    end_idx = raw_output.rfind(']') + 1
+    
+    if start_idx != -1 and end_idx != -1:
+        clean_json = raw_output[start_idx:end_idx]
+        return json.loads(clean_json)
+    else:
+        return json.loads(raw_output) # Fallback
 
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     # Build an HTML table. Pandoc handles HTML-to-Word conversions flawlessly.
