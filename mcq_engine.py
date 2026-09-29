@@ -12,6 +12,8 @@ import PyPDF2
 from docx import Document
 from docx.shared import Mm, Inches
 from docx.enum.section import WD_ORIENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 # --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
@@ -264,30 +266,50 @@ def safe_newline_to_br(text):
     return "".join(parts)
 
 def format_docx_layout(docx_filename):
-    """Post-processes the DOCX to apply A4 Landscape, Narrow Margins, and Table Borders."""
+    """Forces A4 Landscape, Narrow Margins, and injects raw XML to guarantee Table Borders and Autofit Window."""
     doc = Document(docx_filename)
     
-    # 1. Page Layout: A4, Landscape, Narrow Margins
+    # 1. Force Page Layout: A4, Landscape, Narrow Margins (0.5 inches)
     for section in doc.sections:
         section.orientation = WD_ORIENT.LANDSCAPE
-        # Standard A4 Landscape dimensions
         section.page_width = Mm(297)
         section.page_height = Mm(210)
-        
-        # Word's standard "Narrow" margins are 0.5 inches on all sides
         section.left_margin = Inches(0.5)
         section.right_margin = Inches(0.5)
         section.top_margin = Inches(0.5)
         section.bottom_margin = Inches(0.5)
         
-    # 2. Table Formatting: Basic Borders & Autofit Window
+    # 2. Force Table Borders and Autofit using direct Word XML (Oxml)
     for table in doc.tables:
-        # 'Table Grid' is Word's built-in style for basic, standard black borders
-        table.style = 'Table Grid'
+        tbl = table._tbl
+        tblPr = tbl.tblPr
         
-        # This tells Word to Autofit to Window / Contents based on text length
-        table.autofit = True
-        table.allow_autofit = True
+        # --- A. Force Borders ---
+        # Look for existing border tags. If absent, create them.
+        tblBorders = tblPr.find(qn('w:tblBorders'))
+        if tblBorders is None:
+            tblBorders = OxmlElement('w:tblBorders')
+            tblPr.append(tblBorders)
+        else:
+            tblBorders.clear() # Clear any invisible Pandoc borders
+        
+        # Draw solid black lines on all sides and internal grids
+        for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+            border = OxmlElement(f'w:{border_name}')
+            border.set(qn('w:val'), 'single')
+            border.set(qn('w:sz'), '4') # 1/2 point line thickness
+            border.set(qn('w:space'), '0')
+            border.set(qn('w:color'), '000000') # Solid Black
+            tblBorders.append(border)
+            
+        # --- B. Force Autofit to Window ---
+        tblW = tblPr.find(qn('w:tblW'))
+        if tblW is None:
+            tblW = OxmlElement('w:tblW')
+            tblPr.append(tblW)
+        # 'pct' stands for percentage. 5000 pct is Word XML for 100% window width.
+        tblW.set(qn('w:type'), 'pct') 
+        tblW.set(qn('w:w'), '5000')   
         
     doc.save(docx_filename)
 
