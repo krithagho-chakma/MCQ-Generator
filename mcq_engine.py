@@ -70,7 +70,7 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
 
     CRITICAL INSTRUCTION FOR MATH AND JSON ESCAPING:
     1. If the text contains mathematical equations or physics/chemistry formulas, you MUST use standard LaTeX (e.g., $E=mc^2$).
-    2. You MUST double-escape all LaTeX backslashes for valid JSON (e.g., use \\frac{1}{2} instead of \frac{1}{2}, and \\sum instead of \sum).
+    2. You MUST double-escape all LaTeX backslashes for valid JSON (e.g., use \\frac{{1}}{{2}} instead of \frac{{1}}{{2}}, and \\sum instead of \sum).
     3. Output EXACTLY ONE continuous JSON array. Do not split the output into multiple arrays. Do not add any conversational text before or after the JSON.
     
     CRITICAL INSTRUCTION FOR IMAGES:
@@ -79,7 +79,7 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     CRITICAL INSTRUCTION FOR DATA TABLES:
     If the source text contains data tables (formatted in Markdown like |---|---|), you MUST convert them into basic HTML tables (e.g., <table border='1'><tr><td>...</td></tr></table>) inside the JSON string. 
     - Do NOT use Markdown tables in your output.
-    - Write the ENTIRE HTML table on a SINGLE LINE (do not use \n characters inside the HTML table) so it does not break the JSON string or downstream formatting.
+    - Write the ENTIRE HTML table on a SINGLE LINE (do not use \\n characters inside the HTML table) so it does not break the JSON string or downstream formatting.
     
     CRITICAL INSTRUCTIONS FOR DIFFICULTY LEVEL:
     You must generate EXACTLY:
@@ -172,7 +172,7 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     CRITICAL INSTRUCTION FOR DATA TABLES:
     If the source text contains data tables (formatted in Markdown like |---|---|), you MUST convert them into basic HTML tables (e.g., <table border='1'><tr><td>...</td></tr></table>) inside the JSON string. 
     - Do NOT use Markdown tables in your output.
-    - Write the ENTIRE HTML table on a SINGLE LINE (do not use \n characters inside the HTML table) so it does not break the JSON string or downstream formatting.
+    - Write the ENTIRE HTML table on a SINGLE LINE (do not use \\n characters inside the HTML table) so it does not break the JSON string or downstream formatting.
     
     CRITICAL INSTRUCTION FOR THE 'topics' FIELD:
     Here is a list of allowed topics: {user_topics}
@@ -392,6 +392,37 @@ def run_mcq_interface(model_choice, api_key_input):
         st.session_state["mcq_data_t1"] = None
     if "mcq_data_t2" not in st.session_state:
         st.session_state["mcq_data_t2"] = None
+        
+    # --- UI ENHANCEMENTS: Tab Glow Effect & Notification ---
+    st.markdown(
+        """
+        <style>
+        /* Pulse Animation for Tab 2 to make it highly noticeable */
+        @keyframes glowing-tab {
+            0% { box-shadow: 0px 0px 5px rgba(43, 196, 138, 0.2); background-color: rgba(43, 196, 138, 0.05); }
+            50% { box-shadow: 0px -4px 15px 2px rgba(43, 196, 138, 0.7); background-color: rgba(43, 196, 138, 0.15); }
+            100% { box-shadow: 0px 0px 5px rgba(43, 196, 138, 0.2); background-color: rgba(43, 196, 138, 0.05); }
+        }
+        /* Target exactly the second tab button */
+        button[data-baseweb="tab"]:nth-child(2) {
+            animation: glowing-tab 2.5s infinite;
+            border-radius: 8px 8px 0px 0px !important;
+            border-bottom: 3px solid #2bc48a !important;
+            transition: all 0.3s ease-in-out;
+        }
+        button[data-baseweb="tab"]:nth-child(2) p {
+            font-weight: 800 !important;
+            color: #178a5e !important;
+        }
+        </style>
+        """, 
+        unsafe_allow_html=True
+    )
+
+    st.info(
+        "💡 **PRO TIP:** For the best formatting performance, stability, and speed, we highly recommend selecting the **Gemini 3.1 Flash Lite** model from the sidebar settings.", 
+        icon="⚡"
+    )
     
     # Create two clean tabs
     tab1, tab2 = st.tabs(["✨ Generate New MCQs", "📋 Format Existing MCQs"])
