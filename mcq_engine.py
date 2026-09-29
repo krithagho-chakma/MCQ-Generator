@@ -10,6 +10,8 @@ import base64
 import mimetypes
 import PyPDF2
 from docx import Document
+from docx.shared import Mm, Inches
+from docx.enum.section import WD_ORIENT
 
 # --- 3. HELPER FUNCTIONS ---
 def extract_text_from_pdf(pdf_file):
@@ -261,6 +263,34 @@ def safe_newline_to_br(text):
             
     return "".join(parts)
 
+def format_docx_layout(docx_filename):
+    """Post-processes the DOCX to apply A4 Landscape, Narrow Margins, and Table Borders."""
+    doc = Document(docx_filename)
+    
+    # 1. Page Layout: A4, Landscape, Narrow Margins
+    for section in doc.sections:
+        section.orientation = WD_ORIENT.LANDSCAPE
+        # Standard A4 Landscape dimensions
+        section.page_width = Mm(297)
+        section.page_height = Mm(210)
+        
+        # Word's standard "Narrow" margins are 0.5 inches on all sides
+        section.left_margin = Inches(0.5)
+        section.right_margin = Inches(0.5)
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        
+    # 2. Table Formatting: Basic Borders & Autofit Window
+    for table in doc.tables:
+        # 'Table Grid' is Word's built-in style for basic, standard black borders
+        table.style = 'Table Grid'
+        
+        # This tells Word to Autofit to Window / Contents based on text length
+        table.autofit = True
+        table.allow_autofit = True
+        
+    doc.save(docx_filename)
+
 def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     html = "<h1>Generated MCQs</h1>\n<table border='1'>\n"
     html += "<tr><th>Sl no.</th><th>Question Title</th><th>Option A</th><th>Option B</th><th>Option C</th><th>Option D</th><th>Solution Body</th><th>Correct Option</th><th>Subject</th><th>Chapter</th><th>Topics</th><th>Question Category</th><th>Difficulty Level</th></tr>\n"
@@ -297,6 +327,9 @@ def create_mcq_docx(mcq_data, output_filename="MCQs.docx"):
     
     # Convert HTML + LaTeX to Word document
     pypandoc.convert_text(html, 'docx', format='html+tex_math_dollars', outputfile=output_filename)
+    
+    # --- NEW: Apply Page Layout and Table Borders ---
+    format_docx_layout(output_filename)
     
     # NOTE: Do NOT delete media folders here! 
     # Keeping them on disk allows infinite re-downloads and interactive cell editing.
