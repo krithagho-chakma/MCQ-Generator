@@ -41,6 +41,17 @@ def extract_text_from_docx(docx_file):
     os.remove("temp.docx")
     return text
 
+def clean_math_backslashes(obj):
+    """Recursively cleans up over-escaped double backslashes back to standard LaTeX single backslashes."""
+    if isinstance(obj, str):
+        # Replaces literal '\\' with literal '\' for perfect Pandoc rendering
+        return obj.replace('\\\\', '\\')
+    elif isinstance(obj, list):
+        return [clean_math_backslashes(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: clean_math_backslashes(v) for k, v in obj.items()}
+    return obj
+
 def robust_json_parser(raw_output):
     """Cleanly parses JSON by utilizing strict=False to natively handle LLM line breaks."""
     import re
@@ -54,12 +65,10 @@ def robust_json_parser(raw_output):
         
     # 1. Protect structural JSON escapes and Unicode
     cleaned = cleaned.replace('\\"', '<<QUOTE>>')
-    # Protect \n ONLY if it acts as a formatting newline (not part of \nabla or \neq)
     cleaned = re.sub(r'\\n(?![a-zA-Z])', '<<NEWLINE>>', cleaned)
-    # Protect Bengali Unicode
     cleaned = re.sub(r'\\u([0-9a-fA-F]{4})', r'<<UNICODE_\1>>', cleaned)
     
-    # 2. Escape ALL rogue math backslashes (\sqrt, \frac, \text)
+    # 2. Escape ALL rogue math backslashes to prevent JSON crashes
     cleaned = cleaned.replace('\\', '\\\\')
     
     # 3. Restore protected JSON escapes
@@ -68,13 +77,16 @@ def robust_json_parser(raw_output):
     cleaned = re.sub(r'<<UNICODE_([0-9a-fA-F]{4})>>', r'\\u\1', cleaned)
     
     try:
-        # strict=False is the magic bullet that safely parses literal line breaks!
-        return json.loads(cleaned, strict=False)
+        # strict=False safely parses literal line breaks
+        parsed_data = json.loads(cleaned, strict=False)
+        # 4. Wash the parsed dictionary to normalize math for Pandoc
+        return clean_math_backslashes(parsed_data)
     except json.JSONDecodeError as e:
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(0), strict=False)
+                parsed_data = json.loads(match.group(0), strict=False)
+                return clean_math_backslashes(parsed_data)
             except:
                 pass
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT:\n{raw_output}")
