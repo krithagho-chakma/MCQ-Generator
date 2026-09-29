@@ -40,7 +40,17 @@ def extract_text_from_docx(docx_file):
     text = pypandoc.convert_file("temp.docx", "markdown", extra_args=["--extract-media=."])
     os.remove("temp.docx")
     return text
-    
+
+def clean_math_backslashes(obj):
+    """Recursively cleans up over-escaped double backslashes back to standard LaTeX single backslashes."""
+    if isinstance(obj, str):
+        return obj.replace('\\\\', '\\')
+    elif isinstance(obj, list):
+        return [clean_math_backslashes(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: clean_math_backslashes(v) for k, v in obj.items()}
+    return obj
+
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
@@ -127,18 +137,17 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     raw_output = raw_output.replace('<<QUOTE>>', '\\"')
         
     try:
-        return json.loads(raw_output)
+        parsed_data = json.loads(raw_output)
+        return clean_math_backslashes(parsed_data)
     except json.JSONDecodeError as e:
-        # 2. If it still fails, try a non-greedy regex to find just the first complete array
         import re
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(0))
+                parsed_data = json.loads(match.group(0))
+                return clean_math_backslashes(parsed_data)
             except:
                 pass
-        
-        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
@@ -208,18 +217,17 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         raw_output = raw_output[3:-3].strip()
         
     try:
-        return json.loads(raw_output)
+        parsed_data = json.loads(raw_output)
+        return clean_math_backslashes(parsed_data)
     except json.JSONDecodeError as e:
-        # 2. If it still fails, try a non-greedy regex to find just the first complete array
         import re
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(0))
+                parsed_data = json.loads(match.group(0))
+                return clean_math_backslashes(parsed_data)
             except:
                 pass
-        
-        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
 def process_html_images(text):
