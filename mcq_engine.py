@@ -116,6 +116,16 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     elif raw_output.startswith("```"):
         raw_output = raw_output[3:-3].strip()
         
+    # --- 2. The LaTeX Backslash Sanitizer ---
+    # Temporarily hide valid JSON newlines and quotes
+    raw_output = raw_output.replace('\\n', '<<NEWLINE>>')
+    raw_output = raw_output.replace('\\"', '<<QUOTE>>')
+    # Forcefully double-escape all remaining rogue LaTeX backslashes (e.g., \frac becomes \\frac)
+    raw_output = raw_output.replace('\\', '\\\\')
+    # Restore the valid JSON formatting
+    raw_output = raw_output.replace('<<NEWLINE>>', '\\n')
+    raw_output = raw_output.replace('<<QUOTE>>', '\\"')
+        
     try:
         return json.loads(raw_output)
     except json.JSONDecodeError as e:
