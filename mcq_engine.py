@@ -69,14 +69,12 @@ def robust_json_parser(raw_output):
     
     try:
         # strict=False is the magic bullet that safely parses literal line breaks!
-        parsed_data = json.loads(cleaned, strict=False)
-        return restore_backslashes(parsed_data)
+        return json.loads(cleaned, strict=False)
     except json.JSONDecodeError as e:
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
         if match:
             try:
-                parsed_data = json.loads(match.group(0), strict=False)
-                return restore_backslashes(parsed_data)
+                return json.loads(match.group(0), strict=False)
             except:
                 pass
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT:\n{raw_output}")
