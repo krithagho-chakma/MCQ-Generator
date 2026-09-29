@@ -42,28 +42,45 @@ def extract_text_from_docx(docx_file):
     return text
 
 def robust_json_parser(raw_output):
-    """Sanitizes AI output, surgically escaping rogue LaTeX while preserving JSON structure."""
+    """
+    A permanent, surgical JSON parser designed to perfectly uncouple LaTeX math 
+    from structural JSON formatting, while preserving Unicode text natively.
+    """
     import re
     import json
     
     cleaned = raw_output.strip()
     
-    # 1. Strip rogue markdown formatting
+    # 1. Strip rogue markdown blocks
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:-3].strip()
     elif cleaned.startswith("```"):
         cleaned = cleaned[3:-3].strip()
         
-    # 2. THE SURGICAL REGEX FIX
-    # This looks at every backslash (\). 
-    # If the backslash is NOT followed by n, ", \, or /, it forces it to become double (\\).
-    # This perfectly protects JSON newlines and quotes, while escaping \frac, \text, \gamma, etc.
-    cleaned = re.sub(r'\\(?![n"\\/])', r'\\\\', cleaned)
+    # 2. PRE-ESCAPE SPECIFIC LATEX COLLISION COMMANDS
+    # These LaTeX commands start with 'n'. If we don't protect them here, 
+    # the parser will mistake them for JSON newlines (\n). 
+    # This safely turns \neq into \\neq before the master regex runs.
+    latex_n_commands = ['neq', 'nabla', 'nu', 'notin', 'natural', 'nearrow', 'nwarrow']
+    for cmd in latex_n_commands:
+        cleaned = re.sub(r'(?<!\\)\\' + cmd, r'\\\\' + cmd, cleaned)
+        
+    # 3. THE MASTER REGEX
+    # This is the ultimate fix. It finds every backslash (\) and double-escapes it, 
+    # UNLESS it is followed by one of these critical JSON structures:
+    # - n : JSON newline
+    # - " : JSON escaped quote
+    # - \ : Already escaped backslash
+    # - / : JSON forward slash
+    # - uXXXX : Valid 4-digit hex Unicode (Crucial for preserving Bengali text!)
+    # 
+    # This forces \frac -> \\frac and \uparrow -> \\uparrow, but leaves \u0985 as \u0985.
+    cleaned = re.sub(r'\\(?!(?:n|"|\\|/|u[0-9a-fA-F]{4}))', r'\\\\', cleaned)
     
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        # 3. Fallback: Search for the array block if there's trailing conversational text
+        # 4. Fallback sequence for incomplete generation trailing text
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
         if match:
             try:
