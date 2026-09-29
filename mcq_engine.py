@@ -43,51 +43,57 @@ def extract_text_from_docx(docx_file):
 
 def robust_json_parser(raw_output):
     """
-    A permanent, surgical JSON parser designed to perfectly uncouple LaTeX math 
-    from structural JSON formatting, while preserving Unicode text natively.
+    An ironclad JSON parser that sanitizes AI output by fixing literal newlines,
+    protecting Bengali Unicode, and aggressively double-escaping rogue LaTeX math.
     """
     import re
     import json
     
     cleaned = raw_output.strip()
     
-    # 1. Strip rogue markdown blocks
+    # 1. Strip rogue markdown formatting
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:-3].strip()
     elif cleaned.startswith("```"):
         cleaned = cleaned[3:-3].strip()
         
-    # 2. PRE-ESCAPE SPECIFIC LATEX COLLISION COMMANDS
-    # These LaTeX commands start with 'n'. If we don't protect them here, 
-    # the parser will mistake them for JSON newlines (\n). 
-    # This safely turns \neq into \\neq before the master regex runs.
-    latex_n_commands = ['neq', 'nabla', 'nu', 'notin', 'natural', 'nearrow', 'nwarrow']
-    for cmd in latex_n_commands:
-        cleaned = re.sub(r'(?<!\\)\\' + cmd, r'\\\\' + cmd, cleaned)
-        
-    # 3. THE MASTER REGEX
-    # This is the ultimate fix. It finds every backslash (\) and double-escapes it, 
-    # UNLESS it is followed by one of these critical JSON structures:
-    # - n : JSON newline
-    # - " : JSON escaped quote
-    # - \ : Already escaped backslash
-    # - / : JSON forward slash
-    # - uXXXX : Valid 4-digit hex Unicode (Crucial for preserving Bengali text!)
-    # 
-    # This forces \frac -> \\frac and \uparrow -> \\uparrow, but leaves \u0985 as \u0985.
-    cleaned = re.sub(r'\\(?!(?:n|"|\\|/|u[0-9a-fA-F]{4}))', r'\\\\', cleaned)
+    # 2. Fix Literal Newlines
+    # If the AI generated actual line breaks inside the JSON string, 
+    # this safely converts the literal line break character into a JSON-safe '\n' string.
+    cleaned = cleaned.replace('\r\n', '\\n').replace('\n', '\\n')
     
+    # 3. The "Safe Hide" Strategy for Backslashes
+    # We temporarily hide the backslashes that JSON actually NEEDS to function 
+    # (like quotes, structural newlines, and Bengali Unicode).
+    cleaned = cleaned.replace('\\"', '<<QUOTE>>')
+    cleaned = cleaned.replace('\\n', '<<NEWLINE>>')
+    
+    # Temporarily hide Bengali Unicode signatures (e.g., \u0995) so they don't break
+    cleaned = re.sub(r'\\u([0-9a-fA-F]{4})', r'<<UNICODE_\1>>', cleaned)
+    
+    # 4. Annihilate the Rogue LaTeX
+    # Now that the important JSON structures are safely hidden, EVERY single backslash 
+    # left in the document is guaranteed to be a rogue LaTeX command (\sqrt, \frac, \pi).
+    # We forcefully double-escape them all.
+    cleaned = cleaned.replace('\\', '\\\\')
+    
+    # 5. Restore the Hidden JSON Structures
+    cleaned = cleaned.replace('<<QUOTE>>', '\\"')
+    cleaned = cleaned.replace('<<NEWLINE>>', '\\n')
+    cleaned = re.sub(r'<<UNICODE_([0-9a-fA-F]{4})>>', r'\\u\1', cleaned)
+    
+    # 6. Parse
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        # 4. Fallback sequence for incomplete generation trailing text
+        # Fallback: Search for the array block if the AI appended conversational text
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(0))
             except:
                 pass
-        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
+        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT:\n{raw_output}")
 
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
     model = genai.GenerativeModel(selected_model)
