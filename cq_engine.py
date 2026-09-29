@@ -1,6 +1,7 @@
 import streamlit as st
 
-def run_cq_interface():
+# We added the two arguments here so app.py doesn't crash when trying to pass them
+def run_cq_interface(model_choice, api_key_input):
     """Placeholder interface for the upcoming CQ Engine."""
     st.title("📝 Constructive Questions (CQ) Engine")
     
@@ -12,5 +13,5 @@ def run_cq_interface():
         icon="⏳"
     )
     
-    # Optional: Add a disabled button to visually indicate it's a future feature
-    st.button("🚀 Generate CQs", disabled=True, width="stretch")
+    # A disabled button to visually indicate it's a future feature
+    st.button("🚀 Generate CQs", disabled=True, use_container_width=True)
