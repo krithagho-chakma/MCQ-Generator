@@ -276,7 +276,7 @@ def safe_newline_to_br(text):
     return "".join(parts)
 
 def format_docx_layout(docx_filename):
-    """Forces A4 Landscape, Narrow Margins, and injects raw XML to guarantee Table Borders and Autofit Window."""
+    """Forces A4 Landscape, Narrow Margins, and injects raw XML to guarantee Table Borders for both outer and nested tables."""
     doc = Document(docx_filename)
     
     # 1. Force Page Layout: A4, Landscape, Narrow Margins (0.5 inches)
@@ -289,27 +289,26 @@ def format_docx_layout(docx_filename):
         section.top_margin = Inches(0.5)
         section.bottom_margin = Inches(0.5)
         
-    # 2. Force Table Borders and Autofit using direct Word XML (Oxml)
-    for table in doc.tables:
-        tbl = table._tbl
+    # Helper function to apply raw XML borders and autofit to any given table object
+    def apply_xml_borders(tbl_obj):
+        tbl = tbl_obj._tbl
         tblPr = tbl.tblPr
         
         # --- A. Force Borders ---
-        # Look for existing border tags. If absent, create them.
         tblBorders = tblPr.find(qn('w:tblBorders'))
         if tblBorders is None:
             tblBorders = OxmlElement('w:tblBorders')
             tblPr.append(tblBorders)
         else:
-            tblBorders.clear() # Clear any invisible Pandoc borders
+            tblBorders.clear() 
         
         # Draw solid black lines on all sides and internal grids
         for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
             border = OxmlElement(f'w:{border_name}')
             border.set(qn('w:val'), 'single')
-            border.set(qn('w:sz'), '4') # 1/2 point line thickness
+            border.set(qn('w:sz'), '4') 
             border.set(qn('w:space'), '0')
-            border.set(qn('w:color'), '000000') # Solid Black
+            border.set(qn('w:color'), '000000') 
             tblBorders.append(border)
             
         # --- B. Force Autofit to Window ---
@@ -317,9 +316,20 @@ def format_docx_layout(docx_filename):
         if tblW is None:
             tblW = OxmlElement('w:tblW')
             tblPr.append(tblW)
-        # 'pct' stands for percentage. 5000 pct is Word XML for 100% window width.
         tblW.set(qn('w:type'), 'pct') 
         tblW.set(qn('w:w'), '5000')   
+
+    # 2. Iterate through all tables (both Main and Nested)
+    for main_table in doc.tables:
+        # Apply borders to the master outer table
+        apply_xml_borders(main_table)
+        
+        # Dig into the rows and cells to find any inner tables
+        for row in main_table.rows:
+            for cell in row.cells:
+                for nested_table in cell.tables:
+                    # Apply the exact same borders to the inner table
+                    apply_xml_borders(nested_table)
         
     doc.save(docx_filename)
 
