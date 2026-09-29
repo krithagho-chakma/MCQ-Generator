@@ -40,57 +40,7 @@ def extract_text_from_docx(docx_file):
     text = pypandoc.convert_file("temp.docx", "markdown", extra_args=["--extract-media=."])
     os.remove("temp.docx")
     return text
-
-def clean_math_backslashes(obj):
-    """Recursively cleans up over-escaped double backslashes back to standard LaTeX single backslashes."""
-    if isinstance(obj, str):
-        # Replaces literal '\\' with literal '\' for perfect Pandoc rendering
-        return obj.replace('\\\\', '\\')
-    elif isinstance(obj, list):
-        return [clean_math_backslashes(item) for item in obj]
-    elif isinstance(obj, dict):
-        return {k: clean_math_backslashes(v) for k, v in obj.items()}
-    return obj
-
-def robust_json_parser(raw_output):
-    """Cleanly parses JSON by utilizing strict=False to natively handle LLM line breaks."""
-    import re
-    import json
     
-    cleaned = raw_output.strip()
-    if cleaned.startswith("```json"):
-        cleaned = cleaned[7:-3].strip()
-    elif cleaned.startswith("```"):
-        cleaned = cleaned[3:-3].strip()
-        
-    # 1. Protect structural JSON escapes and Unicode
-    cleaned = cleaned.replace('\\"', '<<QUOTE>>')
-    cleaned = re.sub(r'\\n(?![a-zA-Z])', '<<NEWLINE>>', cleaned)
-    cleaned = re.sub(r'\\u([0-9a-fA-F]{4})', r'<<UNICODE_\1>>', cleaned)
-    
-    # 2. Escape ALL rogue math backslashes to prevent JSON crashes
-    cleaned = cleaned.replace('\\', '\\\\')
-    
-    # 3. Restore protected JSON escapes
-    cleaned = cleaned.replace('<<QUOTE>>', '\\"')
-    cleaned = cleaned.replace('<<NEWLINE>>', '\\n')
-    cleaned = re.sub(r'<<UNICODE_([0-9a-fA-F]{4})>>', r'\\u\1', cleaned)
-    
-    try:
-        # strict=False safely parses literal line breaks
-        parsed_data = json.loads(cleaned, strict=False)
-        # 4. Wash the parsed dictionary to normalize math for Pandoc
-        return clean_math_backslashes(parsed_data)
-    except json.JSONDecodeError as e:
-        match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
-        if match:
-            try:
-                parsed_data = json.loads(match.group(0), strict=False)
-                return clean_math_backslashes(parsed_data)
-            except:
-                pass
-        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT:\n{raw_output}")
-
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
@@ -151,17 +101,45 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     {context_block}
     """
     
-# Force max_output_tokens so Gemini doesn't cut off large JSON arrays mid-sentence
     response = model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            max_output_tokens=8192 # Forces maximum memory so it doesn't cut off mid-sentence
         )
     )
     
-    # Route the output through our surgical master parser
-    return robust_json_parser(response.text)
+    raw_output = response.text.strip()
+    
+    # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
+    if raw_output.startswith("```json"):
+        raw_output = raw_output[7:-3].strip()
+    elif raw_output.startswith("```"):
+        raw_output = raw_output[3:-3].strip()
+        
+    # --- 2. The LaTeX Backslash Sanitizer ---
+    # Temporarily hide valid JSON newlines and quotes
+    raw_output = raw_output.replace('\\n', '<<NEWLINE>>')
+    raw_output = raw_output.replace('\\"', '<<QUOTE>>')
+    # Forcefully double-escape all remaining rogue LaTeX backslashes (e.g., \frac becomes \\frac)
+    raw_output = raw_output.replace('\\', '\\\\')
+    # Restore the valid JSON formatting
+    raw_output = raw_output.replace('<<NEWLINE>>', '\\n')
+    raw_output = raw_output.replace('<<QUOTE>>', '\\"')
+        
+    try:
+        return json.loads(raw_output)
+    except json.JSONDecodeError as e:
+        # 2. If it still fails, try a non-greedy regex to find just the first complete array
+        import re
+        match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except:
+                pass
+        
+        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
+        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
     model = genai.GenerativeModel(selected_model)
@@ -214,18 +192,36 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     {raw_mcq_text}
     """
     
-    # Force max_output_tokens so Gemini doesn't cut off large JSON arrays mid-sentence
     response = model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            max_output_tokens=8192 # Forces maximum memory so it doesn't cut off mid-sentence
         )
     )
     
-    # Route the output through our surgical master parser
-    return robust_json_parser(response.text)
+    raw_output = response.text.strip()
     
+    # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
+    if raw_output.startswith("```json"):
+        raw_output = raw_output[7:-3].strip()
+    elif raw_output.startswith("```"):
+        raw_output = raw_output[3:-3].strip()
+        
+    try:
+        return json.loads(raw_output)
+    except json.JSONDecodeError as e:
+        # 2. If it still fails, try a non-greedy regex to find just the first complete array
+        import re
+        match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except:
+                pass
+        
+        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
+        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
+        
 def process_html_images(text):
     """Converts Markdown images to HTML, locks width to 2 inches, 
     and aggressively annihilates multi-line Pandoc artifacts."""
