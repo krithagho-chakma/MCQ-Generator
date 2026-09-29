@@ -40,7 +40,37 @@ def extract_text_from_docx(docx_file):
     text = pypandoc.convert_file("temp.docx", "markdown", extra_args=["--extract-media=."])
     os.remove("temp.docx")
     return text
+
+def robust_json_parser(raw_output):
+    """Sanitizes AI output, escapes rogue LaTeX, and parses JSON safely."""
+    cleaned = raw_output.strip()
     
+    # 1. Strip rogue markdown formatting
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:-3].strip()
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[3:-3].strip()
+        
+    # 2. Aggressive Backslash Sanitizer (Protects \n and \", escapes the rest)
+    cleaned = cleaned.replace('\\n', '<<NEWLINE>>')
+    cleaned = cleaned.replace('\\"', '<<QUOTE>>')
+    cleaned = cleaned.replace('\\', '\\\\')
+    cleaned = cleaned.replace('<<NEWLINE>>', '\\n')
+    cleaned = cleaned.replace('<<QUOTE>>', '\\"')
+    
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        # 3. Fallback: Search for the array block
+        import re
+        match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except:
+                pass
+        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
+
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
     model = genai.GenerativeModel(selected_model)
     total_questions = num_easy + num_medium + num_hard
@@ -101,45 +131,17 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     {context_block}
     """
     
+# Force max_output_tokens so Gemini doesn't cut off large JSON arrays mid-sentence
     response = model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
+            max_output_tokens=8192 
         )
     )
     
-    raw_output = response.text.strip()
-    
-    # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
-    if raw_output.startswith("```json"):
-        raw_output = raw_output[7:-3].strip()
-    elif raw_output.startswith("```"):
-        raw_output = raw_output[3:-3].strip()
-        
-    # --- 2. The LaTeX Backslash Sanitizer ---
-    # Temporarily hide valid JSON newlines and quotes
-    raw_output = raw_output.replace('\\n', '<<NEWLINE>>')
-    raw_output = raw_output.replace('\\"', '<<QUOTE>>')
-    # Forcefully double-escape all remaining rogue LaTeX backslashes (e.g., \frac becomes \\frac)
-    raw_output = raw_output.replace('\\', '\\\\')
-    # Restore the valid JSON formatting
-    raw_output = raw_output.replace('<<NEWLINE>>', '\\n')
-    raw_output = raw_output.replace('<<QUOTE>>', '\\"')
-        
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError as e:
-        # 2. If it still fails, try a non-greedy regex to find just the first complete array
-        import re
-        match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except:
-                pass
-        
-        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
-        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
+    # Route the output through our new master parser
+    return robust_json_parser(response.text)
         
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
     model = genai.GenerativeModel(selected_model)
@@ -192,36 +194,18 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     {raw_mcq_text}
     """
     
+    # Force max_output_tokens so Gemini doesn't cut off large JSON arrays mid-sentence
     response = model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
+            max_output_tokens=8192
         )
     )
     
-    raw_output = response.text.strip()
+    # Route the output through our new master parser
+    return robust_json_parser(response.text)
     
-    # 1. Strip rogue markdown formatting if Gemini ignored the mime_type
-    if raw_output.startswith("```json"):
-        raw_output = raw_output[7:-3].strip()
-    elif raw_output.startswith("```"):
-        raw_output = raw_output[3:-3].strip()
-        
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError as e:
-        # 2. If it still fails, try a non-greedy regex to find just the first complete array
-        import re
-        match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except:
-                pass
-        
-        # 3. If all parsing fails, raise a custom error showing the EXACT broken text
-        raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
-        
 def process_html_images(text):
     """Converts Markdown images to HTML, locks width to 2 inches, 
     and aggressively annihilates multi-line Pandoc artifacts."""
