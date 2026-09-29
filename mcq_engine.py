@@ -42,7 +42,10 @@ def extract_text_from_docx(docx_file):
     return text
 
 def robust_json_parser(raw_output):
-    """Sanitizes AI output, escapes rogue LaTeX, and parses JSON safely."""
+    """Sanitizes AI output, surgically escaping rogue LaTeX while preserving JSON structure."""
+    import re
+    import json
+    
     cleaned = raw_output.strip()
     
     # 1. Strip rogue markdown formatting
@@ -51,18 +54,16 @@ def robust_json_parser(raw_output):
     elif cleaned.startswith("```"):
         cleaned = cleaned[3:-3].strip()
         
-    # 2. Aggressive Backslash Sanitizer (Protects \n and \", escapes the rest)
-    cleaned = cleaned.replace('\\n', '<<NEWLINE>>')
-    cleaned = cleaned.replace('\\"', '<<QUOTE>>')
-    cleaned = cleaned.replace('\\', '\\\\')
-    cleaned = cleaned.replace('<<NEWLINE>>', '\\n')
-    cleaned = cleaned.replace('<<QUOTE>>', '\\"')
+    # 2. THE SURGICAL REGEX FIX
+    # This looks at every backslash (\). 
+    # If the backslash is NOT followed by n, ", \, or /, it forces it to become double (\\).
+    # This perfectly protects JSON newlines and quotes, while escaping \frac, \text, \gamma, etc.
+    cleaned = re.sub(r'\\(?![n"\\/])', r'\\\\', cleaned)
     
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        # 3. Fallback: Search for the array block
-        import re
+        # 3. Fallback: Search for the array block if there's trailing conversational text
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
         if match:
             try:
@@ -136,11 +137,11 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
         prompt,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            max_output_tokens=8192 
+            max_output_tokens=8192 # Forces maximum memory so it doesn't cut off mid-sentence
         )
     )
     
-    # Route the output through our new master parser
+    # Route the output through our surgical master parser
     return robust_json_parser(response.text)
         
 def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
@@ -199,11 +200,11 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         prompt,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            max_output_tokens=8192
+            max_output_tokens=8192 # Forces maximum memory so it doesn't cut off mid-sentence
         )
     )
     
-    # Route the output through our new master parser
+    # Route the output through our surgical master parser
     return robust_json_parser(response.text)
     
 def process_html_images(text):
