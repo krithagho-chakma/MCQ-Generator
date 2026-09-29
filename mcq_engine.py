@@ -42,55 +42,41 @@ def extract_text_from_docx(docx_file):
     return text
 
 def robust_json_parser(raw_output):
-    """
-    An ironclad JSON parser that sanitizes AI output by fixing literal newlines,
-    protecting Bengali Unicode, and aggressively double-escaping rogue LaTeX math.
-    """
+    """Cleanly parses JSON by utilizing strict=False to natively handle LLM line breaks."""
     import re
     import json
     
     cleaned = raw_output.strip()
-    
-    # 1. Strip rogue markdown formatting
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:-3].strip()
     elif cleaned.startswith("```"):
         cleaned = cleaned[3:-3].strip()
         
-    # 2. Fix Literal Newlines
-    # If the AI generated actual line breaks inside the JSON string, 
-    # this safely converts the literal line break character into a JSON-safe '\n' string.
-    cleaned = cleaned.replace('\r\n', '\\n').replace('\n', '\\n')
-    
-    # 3. The "Safe Hide" Strategy for Backslashes
-    # We temporarily hide the backslashes that JSON actually NEEDS to function 
-    # (like quotes, structural newlines, and Bengali Unicode).
+    # 1. Protect structural JSON escapes and Unicode
     cleaned = cleaned.replace('\\"', '<<QUOTE>>')
-    cleaned = cleaned.replace('\\n', '<<NEWLINE>>')
-    
-    # Temporarily hide Bengali Unicode signatures (e.g., \u0995) so they don't break
+    # Protect \n ONLY if it acts as a formatting newline (not part of \nabla or \neq)
+    cleaned = re.sub(r'\\n(?![a-zA-Z])', '<<NEWLINE>>', cleaned)
+    # Protect Bengali Unicode
     cleaned = re.sub(r'\\u([0-9a-fA-F]{4})', r'<<UNICODE_\1>>', cleaned)
     
-    # 4. Annihilate the Rogue LaTeX
-    # Now that the important JSON structures are safely hidden, EVERY single backslash 
-    # left in the document is guaranteed to be a rogue LaTeX command (\sqrt, \frac, \pi).
-    # We forcefully double-escape them all.
+    # 2. Escape ALL rogue math backslashes (\sqrt, \frac, \text)
     cleaned = cleaned.replace('\\', '\\\\')
     
-    # 5. Restore the Hidden JSON Structures
+    # 3. Restore protected JSON escapes
     cleaned = cleaned.replace('<<QUOTE>>', '\\"')
     cleaned = cleaned.replace('<<NEWLINE>>', '\\n')
     cleaned = re.sub(r'<<UNICODE_([0-9a-fA-F]{4})>>', r'\\u\1', cleaned)
     
-    # 6. Parse
     try:
-        return json.loads(cleaned)
+        # strict=False is the magic bullet that safely parses literal line breaks!
+        parsed_data = json.loads(cleaned, strict=False)
+        return restore_backslashes(parsed_data)
     except json.JSONDecodeError as e:
-        # Fallback: Search for the array block if the AI appended conversational text
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', cleaned, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(0))
+                parsed_data = json.loads(match.group(0), strict=False)
+                return restore_backslashes(parsed_data)
             except:
                 pass
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT:\n{raw_output}")
