@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import json
 import pymupdf4llm
 import pypandoc
@@ -51,8 +52,10 @@ def clean_math_backslashes(obj):
         return {k: clean_math_backslashes(v) for k, v in obj.items()}
     return obj
 
-def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model):
-    model = genai.GenerativeModel(selected_model)
+# 1. Add api_key to the function arguments
+def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model, api_key):
+    # 2. Initialize the new Client
+    client = genai.Client(api_key=api_key)
     total_questions = num_easy + num_medium + num_hard
     
     if context_text.strip():
@@ -111,9 +114,11 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     {context_block}
     """
     
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
+    # 3. Use the new generation syntax
+    response = client.models.generate_content(
+        model=selected_model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             response_mime_type="application/json",
         )
     )
@@ -150,8 +155,10 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
                 pass
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
         
-def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model):
-    model = genai.GenerativeModel(selected_model)
+# 1. Add api_key to the function arguments
+def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selected_model, api_key):
+    # 2. Initialize the new Client
+    client = genai.Client(api_key=api_key)
     
     prompt = f"""
     You are an expert educational content parser and converter.
@@ -201,9 +208,11 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     {raw_mcq_text}
     """
     
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
+    # 3. Use the new generation syntax
+    response = client.models.generate_content(
+        model=selected_model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             response_mime_type="application/json",
         )
     )
@@ -463,7 +472,7 @@ def run_mcq_interface(model_choice, api_key_input):
                         # Fetch and save data into Session State so it doesn't vanish when edited
                         st.session_state["mcq_data_t1"] = generate_mcqs(
                             text_to_process, topics_input, custom_instructions, 
-                            num_easy, num_medium, num_hard, model_choice
+                            num_easy, num_medium, num_hard, model_choice, api_key_input
                         )
                         st.success("✨ Generation Complete!")
                     except Exception as e:
@@ -537,7 +546,7 @@ def run_mcq_interface(model_choice, api_key_input):
                     try:
                         # Save parsed data to Session State
                         st.session_state["mcq_data_t2"] = parse_existing_mcqs(
-                            text_to_process, topics_input_t2, special_instructions, model_choice
+                            text_to_process, topics_input_t2, special_instructions, model_choice, api_key_input
                         )
                         st.success("✨ Successfully reformatted into table format!")
                     except Exception as e:
