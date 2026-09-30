@@ -89,7 +89,7 @@ with st.sidebar.expander("ℹ️ How to get a free API key?"):
     4. Select a project (or create a new one) and generate the key.
     5. **Copy** the generated key and **paste** it in the box above.
     
-    *Note: The Gemini 3.1 Flash model is recommended to use for its higher token count! You may use other models as well. But, they have very lower free tier limit.*
+    *Note: The Gemini 3.5 and 3.1 Flash model is recommended to use for its higher token count! You may use other models as well. But, they have very lower free tier limit.*
     """)
 
 if api_key_input:
