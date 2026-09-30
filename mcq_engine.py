@@ -453,7 +453,7 @@ def run_mcq_interface(model_choice, api_key_input):
             
             col_file, col_text = st.columns(2)
             with col_file:
-                uploaded_file = st.file_uploader("Upload Document (PDF/DOCX)", type=["pdf", "docx"])
+                uploaded_file = st.file_uploader("Upload Raw MCQs One DOCX File", type=["pdf", "docx"])
             with col_text:
                 raw_text = st.text_area("Or paste raw text here", height=100)
     
@@ -551,7 +551,7 @@ def run_mcq_interface(model_choice, api_key_input):
             st.caption("Upload or paste your unformatted questions.")
             col_file_t2, col_text_t2 = st.columns(2)
             with col_file_t2:
-                uploaded_file_t2 = st.file_uploader("Upload Raw MCQs (PDF/DOCX)", type=["pdf", "docx"], key="t2_pdf")
+                uploaded_file_t2 = st.file_uploader("Upload Raw MCQs One DOCX File)", type=["pdf", "docx"], key="t2_pdf")
             with col_text_t2:
                 raw_text_t2 = st.text_area("Or paste raw pre-written MCQs here", height=150, placeholder="1. What is CPU?\nA. Brain\nB. Memory\nC. Output\nD. Storage\nAnswer: A", key="t2_text")
         
