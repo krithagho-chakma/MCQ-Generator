@@ -52,6 +52,20 @@ def clean_math_backslashes(obj):
         return {k: clean_math_backslashes(v) for k, v in obj.items()}
     return obj
 
+def format_option_labels(parsed_data):
+    """Ensures options A, B, C, D strictly follow the 'A. Option Title' format, preventing duplicates."""
+    import re
+    if isinstance(parsed_data, list):
+        for mcq in parsed_data:
+            if isinstance(mcq, dict):
+                for opt in ['A', 'B', 'C', 'D']:
+                    if opt in mcq and isinstance(mcq[opt], str):
+                        # 1. Strip any existing prefix the AI or user might have included (e.g., "A.", "a)", "A -")
+                        clean_val = re.sub(rf'^{opt}[\.\)\-]\s*', '', mcq[opt], flags=re.IGNORECASE).strip()
+                        # 2. Force the exact requested format
+                        mcq[opt] = f"{opt}. {clean_val}"
+    return parsed_data
+
 # 1. Add api_key to the function arguments
 def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_medium, num_hard, selected_model, api_key):
     # 2. Initialize the new Client
@@ -97,12 +111,14 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
     DO NOT include sequence identifiers like '1.1', '2.1', etc. in the topic field.
 
     CRITICAL INSTRUCTION FOR 'solution_body':
-    The "solution_body" field MUST follow this exact 2-line format:
+    The "solution_body" field MUST follow this exact 3-line format:
     Line 1: The exact text of the correct option (DO NOT include sequence identifiers like 'A.', 'B.', 'Option A', '১.', etc.). Place an Enter at the end of the line.
-    Line 2: A clear, detailed explanation of why this answer is correct. Always start with the line 'ব্যাখ্যা:'
+    Line 2: Enter just a space (paragraph mark). DO NOT put any texts here.
+    Line 3: A clear, detailed explanation of why this answer is correct. Always start with the line 'ব্যাখ্যা:'
 
     Example format for solution_body:
     "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
+    
     ব্যাখ্যা: কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
 
     Output the result STRICTLY as a JSON array of objects.
@@ -143,14 +159,16 @@ def generate_mcqs(context_text, user_topics, custom_instructions, num_easy, num_
         
     try:
         parsed_data = json.loads(raw_output)
-        return clean_math_backslashes(parsed_data)
+        parsed_data = clean_math_backslashes(parsed_data)
+        return format_option_labels(parsed_data) # <-- Added formatter here
     except json.JSONDecodeError as e:
         import re
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
         if match:
             try:
                 parsed_data = json.loads(match.group(0))
-                return clean_math_backslashes(parsed_data)
+                parsed_data = clean_math_backslashes(parsed_data)
+                return format_option_labels(parsed_data) # <-- Added formatter here
             except:
                 pass
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
@@ -167,7 +185,7 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     CRITICAL PARSING RULES:
     1. Parse ALL MCQs found in the input text into a JSON array of objects.
     2. Number the sl_no sequentially starting from 1.
-    3. Extract the Question Title, Option A, Option B, Option C, Option D, Correct Option, and Solution Body (if solution body isn't provided, create a brief accurate explanation).
+    3. Extract the Question Title, Option A, Option B, Option C, Option D, Correct Option, and Solution Body (if solution body isn't provided, create a brief accurate explanation. If the user says no explanation then DO NOT generate any explanation.).
     4. Infer appropriate "subject", "chapter", "question_category" (e.g., Board, Model Test), and "difficulty_level" (Easy, Medium, Hard) for each question.
 
     CRITICAL INSTRUCTION FOR MATH AND EQUATIONS:
@@ -184,15 +202,17 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
     CRITICAL INSTRUCTION FOR THE 'topics' FIELD:
     Here is a list of allowed topics: {user_topics}
     For the "topics" field in each question, you MUST select EXACTLY ONE topic from the list above that best fits the question. Do not invent any new topics.
-    DO NOT include sequence identifiers like '1.0', '2.1', etc.
+    DO NOT include numbering/sequence identifiers like '1.1', '2.1',.... etc.
 
     CRITICAL INSTRUCTION FOR 'solution_body':
-    The "solution_body" field MUST follow this exact 2-line format:
+    The "solution_body" field MUST follow this exact 3-line format:
     Line 1: The exact text of the correct option (DO NOT include sequence identifiers like 'A.', 'B.', 'Option A', '১.', etc.). Place an Enter at the end of the line.
-    Line 2: A clear, detailed explanation of why this answer is correct. Always start with the line 'ব্যাখ্যা:'
+    Line 2: Enter just a space (paragraph mark). DO NOT put any texts here.
+    Line 3: A clear, detailed explanation of why this answer is correct. Always start with the line 'ব্যাখ্যা:'
 
     Example format for solution_body:
     "ইনপুট, প্রসেসিং, আউটপুট, মেমোরি ও কন্ট্রোল ইউনিট
+    
     ব্যাখ্যা: কম্পিউটারের কাজ করার মূল পদ্ধতি হলো তথ্য গ্রহণ, প্রসেসিং, প্রদর্শন ও সংরক্ষণ করা।"
     
     SPECIAL USER INSTRUCTIONS (CRITICAL):
@@ -227,14 +247,16 @@ def parse_existing_mcqs(raw_mcq_text, user_topics, special_instructions, selecte
         
     try:
         parsed_data = json.loads(raw_output)
-        return clean_math_backslashes(parsed_data)
+        parsed_data = clean_math_backslashes(parsed_data)
+        return format_option_labels(parsed_data) # <-- Added formatter here
     except json.JSONDecodeError as e:
         import re
         match = re.search(r'\[.*?\](?=\s*$|\s*```)', raw_output, re.DOTALL)
         if match:
             try:
                 parsed_data = json.loads(match.group(0))
-                return clean_math_backslashes(parsed_data)
+                parsed_data = clean_math_backslashes(parsed_data)
+                return format_option_labels(parsed_data) # <-- Added formatter here
             except:
                 pass
         raise ValueError(f"JSON Error: {str(e)} \n\nRAW AI OUTPUT (Debug this):\n{raw_output}")
