@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from mcq_engine import run_mcq_interface
 from cq_engine import run_cq_interface
 
