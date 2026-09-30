@@ -53,17 +53,35 @@ def clean_math_backslashes(obj):
     return obj
 
 def format_option_labels(parsed_data):
-    """Ensures options A, B, C, D strictly follow the 'A. Option Title' format, preventing duplicates."""
+    """Ensures options follow 'A. Title' format, and forces 'correct_option' to be strictly a single letter."""
     import re
     if isinstance(parsed_data, list):
         for mcq in parsed_data:
             if isinstance(mcq, dict):
+                # 1. Clean and lock the 'correct_option' to a single letter
+                if 'correct_option' in mcq and isinstance(mcq['correct_option'], str):
+                    co_val = mcq['correct_option'].strip()
+                    
+                    # Try to extract A, B, C, or D from common AI outputs (e.g., "A", "A.", "Option B", "C) ")
+                    match = re.match(r'^(?:Option\s*)?([A-D])(?:[\.\)\-:\s]|$)', co_val, re.IGNORECASE)
+                    if match:
+                        mcq['correct_option'] = match.group(1).upper()
+                    else:
+                        # Fallback: if the AI output the full text answer instead, find which option it matches
+                        for opt in ['A', 'B', 'C', 'D']:
+                            if opt in mcq and isinstance(mcq[opt], str):
+                                # Strip prefixes to compare raw text
+                                raw_opt_val = re.sub(rf'^{opt}[\.\)\-]\s*', '', mcq[opt], flags=re.IGNORECASE).strip()
+                                if raw_opt_val == co_val or mcq[opt].strip() == co_val:
+                                    mcq['correct_option'] = opt
+                                    break
+                                    
+                # 2. Format the actual A, B, C, D option columns
                 for opt in ['A', 'B', 'C', 'D']:
                     if opt in mcq and isinstance(mcq[opt], str):
-                        # 1. Strip any existing prefix the AI or user might have included (e.g., "A.", "a)", "A -")
                         clean_val = re.sub(rf'^{opt}[\.\)\-]\s*', '', mcq[opt], flags=re.IGNORECASE).strip()
-                        # 2. Force the exact requested format
                         mcq[opt] = f"{opt}. {clean_val}"
+                        
     return parsed_data
 
 # 1. Add api_key to the function arguments
