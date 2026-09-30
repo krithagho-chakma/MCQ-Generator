@@ -94,7 +94,7 @@ with st.sidebar.expander("ℹ️ How to get a free API key?"):
 
 if api_key_input:
     st.session_state["user_api_key"] = api_key_input
-    genai.configure(api_key=st.session_state["user_api_key"])
+    #genai.configure(api_key=st.session_state["user_api_key"])
     st.sidebar.success("API Key Active")
 else:
     st.sidebar.warning("API key required to proceed.")
